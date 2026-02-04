@@ -190,6 +190,23 @@ agent
 
 Works with both `generate` and `stream`. Only emits agent-generated messages (Assistant, Tool), not inputs (System, User).
 
+### token_usage
+
+Access cumulative token usage across all LLM calls:
+
+```ruby
+agent = MyAgent.new
+agent.generate("Hello!")
+
+if agent.token_usage
+  puts "Total tokens: #{agent.token_usage.total_tokens}"
+  puts "Input: #{agent.token_usage.input_tokens}"
+  puts "Output: #{agent.token_usage.output_tokens}"
+end
+```
+
+Returns `nil` if the provider doesn't report usage, or a `Riffer::TokenUsage` object with accumulated totals.
+
 ## Class Methods
 
 ### find

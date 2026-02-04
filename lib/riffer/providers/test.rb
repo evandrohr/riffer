@@ -27,14 +27,15 @@ class Riffer::Providers::Test < Riffer::Providers::Base
   #
   # content:: String - the response content
   # tool_calls:: Array of Hash - optional tool calls to include
+  # token_usage:: Riffer::TokenUsage or nil - optional token usage data to include
   #
   # Returns void.
   #
   #   provider.stub_response("Hello")
   #   provider.stub_response("", tool_calls: [{name: "my_tool", arguments: '{"key":"value"}'}])
-  #   provider.stub_response("Final response")
+  #   provider.stub_response("Final response", token_usage: Riffer::TokenUsage.new(input_tokens: 10, output_tokens: 5))
   #
-  def stub_response(content, tool_calls: [])
+  def stub_response(content, tool_calls: [], token_usage: nil)
     formatted_tool_calls = tool_calls.map.with_index do |tc, idx|
       {
         id: tc[:id] || "test_id_#{idx}",
@@ -43,7 +44,7 @@ class Riffer::Providers::Test < Riffer::Providers::Base
         arguments: tc[:arguments].is_a?(String) ? tc[:arguments] : tc[:arguments].to_json
       }
     end
-    @stubbed_responses << {role: "assistant", content: content, tool_calls: formatted_tool_calls}
+    @stubbed_responses << {role: "assistant", content: content, tool_calls: formatted_tool_calls, token_usage: token_usage}
   end
 
   # Clears all stubbed responses.
@@ -72,7 +73,11 @@ class Riffer::Providers::Test < Riffer::Providers::Base
     response = next_response
 
     if response.is_a?(Hash)
-      Riffer::Messages::Assistant.new(response[:content], tool_calls: response[:tool_calls] || [])
+      Riffer::Messages::Assistant.new(
+        response[:content],
+        tool_calls: response[:tool_calls] || [],
+        token_usage: response[:token_usage]
+      )
     else
       response
     end
@@ -84,6 +89,7 @@ class Riffer::Providers::Test < Riffer::Providers::Base
     Enumerator.new do |yielder|
       full_content = response[:content] || ""
       tool_calls = response[:tool_calls] || []
+      token_usage = response[:token_usage]
 
       unless full_content.empty?
         content_parts = full_content.split(". ").map { |part| part + (part.end_with?(".") ? "" : ".") }
@@ -107,6 +113,7 @@ class Riffer::Providers::Test < Riffer::Providers::Base
       end
 
       yielder << Riffer::StreamEvents::TextDone.new(full_content)
+      yielder << Riffer::StreamEvents::TokenUsageDone.new(token_usage: token_usage) if token_usage
     end
   end
 end

@@ -122,6 +122,11 @@ class Riffer::Agent
   # Returns Array of Riffer::Messages::Base.
   attr_reader :messages
 
+  # Cumulative token usage across all LLM calls.
+  #
+  # Returns Riffer::TokenUsage or nil.
+  attr_reader :token_usage
+
   # Initializes a new agent.
   #
   # Raises Riffer::ArgumentError if the configured model string is invalid
@@ -129,6 +134,7 @@ class Riffer::Agent
   def initialize
     @messages = []
     @message_callbacks = []
+    @token_usage = nil
     @model_string = self.class.model
     @instructions_text = self.class.instructions
 
@@ -154,6 +160,7 @@ class Riffer::Agent
     loop do
       response = call_llm
       add_message(response)
+      track_token_usage(response.token_usage)
 
       break unless has_tool_calls?(response)
 
@@ -178,6 +185,7 @@ class Riffer::Agent
       loop do
         accumulated_content = ""
         accumulated_tool_calls = []
+        accumulated_token_usage = nil
         current_tool_call = nil
 
         call_llm_stream.each do |event|
@@ -200,11 +208,18 @@ class Riffer::Agent
               arguments: event.arguments
             }
             current_tool_call = nil
+          when Riffer::StreamEvents::TokenUsageDone
+            accumulated_token_usage = event.token_usage
           end
         end
 
-        response = Riffer::Messages::Assistant.new(accumulated_content, tool_calls: accumulated_tool_calls)
+        response = Riffer::Messages::Assistant.new(
+          accumulated_content,
+          tool_calls: accumulated_tool_calls,
+          token_usage: accumulated_token_usage
+        )
         add_message(response)
+        track_token_usage(accumulated_token_usage)
 
         break unless has_tool_calls?(response)
 
@@ -231,6 +246,12 @@ class Riffer::Agent
   def add_message(message)
     @messages << message
     @message_callbacks.each { |callback| callback.call(message) }
+  end
+
+  def track_token_usage(usage)
+    return unless usage
+
+    @token_usage = @token_usage ? @token_usage + usage : usage
   end
 
   def initialize_messages(prompt_or_messages)
