@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+# rbs_inline: enabled
 
 require "json"
 
@@ -8,10 +9,13 @@ require "json"
 #
 # See https://github.com/anthropics/anthropic-sdk-ruby
 class Riffer::Providers::Anthropic < Riffer::Providers::Base
+  #: @client: Anthropic::Client
+
   # Initializes the Anthropic provider.
   #
-  # api_key:: String or nil - Anthropic API key
-  # options:: Hash - additional options passed to Anthropic::Client
+  #: api_key: String? -- Anthropic API key
+  #: **options: untyped
+  #: return: void
   def initialize(api_key: nil, **options)
     depends_on "anthropic"
 
@@ -22,6 +26,10 @@ class Riffer::Providers::Anthropic < Riffer::Providers::Base
 
   private
 
+  #: messages: Array[Riffer::Messages::Base]
+  #: model: String
+  #: **options: untyped
+  #: return: Riffer::Messages::Assistant
   def perform_generate_text(messages, model:, **options)
     partitioned_messages = partition_messages(messages)
     tools = options[:tools]
@@ -45,6 +53,10 @@ class Riffer::Providers::Anthropic < Riffer::Providers::Base
     extract_assistant_message(response, extract_token_usage(response))
   end
 
+  #: messages: Array[Riffer::Messages::Base]
+  #: model: String
+  #: **options: untyped
+  #: return: Enumerator[Riffer::StreamEvents::Base, void]
   def perform_stream_text(messages, model:, **options)
     Enumerator.new do |yielder|
       partitioned_messages = partition_messages(messages)
@@ -131,6 +143,8 @@ class Riffer::Providers::Anthropic < Riffer::Providers::Base
     end
   end
 
+  #: messages: Array[Riffer::Messages::Base]
+  #: return: Hash[Symbol, untyped]
   def partition_messages(messages)
     system_prompts = []
     conversation_messages = []
@@ -161,6 +175,8 @@ class Riffer::Providers::Anthropic < Riffer::Providers::Base
     }
   end
 
+  #: message: Riffer::Messages::Assistant
+  #: return: Hash[Symbol, untyped]
   def convert_assistant_to_anthropic_format(message)
     content = []
     content << {type: "text", text: message.content} if message.content && !message.content.empty?
@@ -168,20 +184,24 @@ class Riffer::Providers::Anthropic < Riffer::Providers::Base
     message.tool_calls.each do |tc|
       content << {
         type: "tool_use",
-        id: tc[:id] || tc[:call_id],
-        name: tc[:name],
-        input: parse_tool_arguments(tc[:arguments])
+        id: tc.id || tc.call_id,
+        name: tc.name,
+        input: parse_tool_arguments(tc.arguments)
       }
     end
 
     {role: "assistant", content: content}
   end
 
+  #: arguments: (String | Hash[String, untyped])?
+  #: return: Hash[String, untyped]
   def parse_tool_arguments(arguments)
     return {} if arguments.nil? || arguments.empty?
     arguments.is_a?(String) ? JSON.parse(arguments) : arguments
   end
 
+  #: response: Anthropic::Models::Message
+  #: return: Riffer::TokenUsage?
   def extract_token_usage(response)
     usage = response.usage
     return nil unless usage
@@ -194,6 +214,9 @@ class Riffer::Providers::Anthropic < Riffer::Providers::Base
     )
   end
 
+  #: response: Anthropic::Models::Message
+  #: token_usage: Riffer::TokenUsage?
+  #: return: Riffer::Messages::Assistant
   def extract_assistant_message(response, token_usage = nil)
     content_blocks = response.content
     raise Riffer::Error, "No content returned from Anthropic API" if content_blocks.nil? || content_blocks.empty?
@@ -207,12 +230,12 @@ class Riffer::Providers::Anthropic < Riffer::Providers::Base
       when "text"
         text_content = block.text
       when "tool_use"
-        tool_calls << {
+        tool_calls << Riffer::Messages::Assistant::ToolCall.new(
           id: block.id,
           call_id: block.id,
           name: block.name,
           arguments: block.input.to_json
-        }
+        )
       end
     end
 
@@ -223,6 +246,8 @@ class Riffer::Providers::Anthropic < Riffer::Providers::Base
     Riffer::Messages::Assistant.new(text_content, tool_calls: tool_calls, token_usage: token_usage)
   end
 
+  #: tool: singleton(Riffer::Tool)
+  #: return: Hash[Symbol, untyped]
   def convert_tool_to_anthropic_format(tool)
     {
       name: tool.name,

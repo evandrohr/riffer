@@ -1,0 +1,44 @@
+# Generated from lib/riffer/messages/assistant.rb with RBS::Inline
+
+# Represents an assistant (LLM) message in a conversation.
+#
+# May include tool calls when the LLM requests tool execution.
+#
+#   msg = Riffer::Messages::Assistant.new("Hello!")
+#   msg.role        # => :assistant
+#   msg.content     # => "Hello!"
+#   msg.tool_calls  # => []
+class Riffer::Messages::Assistant < Riffer::Messages::Base
+  class ToolCall < Struct[untyped]
+    attr_accessor id(): untyped
+
+    attr_accessor call_id(): untyped
+
+    attr_accessor name(): untyped
+
+    attr_accessor arguments(): untyped
+
+    def self.new: (?id: untyped, ?call_id: untyped, ?name: untyped, ?arguments: untyped) -> instance
+                | ({ ?id: untyped, ?call_id: untyped, ?name: untyped, ?arguments: untyped }) -> instance
+  end
+
+  # Array of tool calls requested by the assistant.
+  attr_reader tool_calls: Array[Riffer::Messages::Assistant::ToolCall]
+
+  # Token usage data for this response.
+  attr_reader token_usage: Riffer::TokenUsage?
+
+  # : content: String
+  # : tool_calls: Array[Riffer::Messages::Assistant::ToolCall] -- optional tool calls
+  # : token_usage: Riffer::TokenUsage? -- optional token usage data
+  # : return: void
+  def initialize: (untyped content, ?tool_calls: untyped, ?token_usage: untyped) -> untyped
+
+  # : return: Symbol
+  def role: () -> untyped
+
+  # Converts the message to a hash.
+  #
+  # : return: Hash[Symbol, untyped]
+  def to_h: () -> untyped
+end
