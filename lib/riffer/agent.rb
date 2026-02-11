@@ -91,7 +91,7 @@ class Riffer::Agent
   #
   # See #generate for parameters and return value.
   #
-  #: (*untyped, **untyped) -> String
+  #: (*untyped, **untyped) -> Riffer::Agent::Response
   def self.generate(...)
     new.generate(...)
   end
@@ -103,6 +103,43 @@ class Riffer::Agent
   #: (*untyped, **untyped) -> Enumerator[Riffer::StreamEvents::Base, void]
   def self.stream(...)
     new.stream(...)
+  end
+
+  # Registers a guardrail for input, output, or both phases.
+  #
+  # +phase+ - :before, :after, or :around.
+  # +with+ - the guardrail class (must be subclass of Riffer::Guardrail).
+  # +options+ - additional options passed to the guardrail.
+  #
+  # Raises Riffer::ArgumentError if phase is invalid or guardrail is not a Guardrail class.
+  #: (Symbol, with: singleton(Riffer::Guardrail), **untyped) -> void
+  def self.guardrail(phase, with:, **options)
+    valid_phases = [*Riffer::Guardrails::PHASES, :around]
+    raise Riffer::ArgumentError, "Invalid guardrail phase: #{phase}" unless valid_phases.include?(phase)
+    raise Riffer::ArgumentError, "Guardrail must be a Riffer::Guardrail subclass" unless with.is_a?(Class) && with <= Riffer::Guardrail
+
+    @guardrails ||= {before: [], after: []}
+    config = {class: with, options: options}
+
+    case phase
+    when :before
+      @guardrails[:before] << config
+    when :after
+      @guardrails[:after] << config
+    when :around
+      @guardrails[:before] << config
+      @guardrails[:after] << config
+    end
+  end
+
+  # Returns the registered guardrail configs for a given phase.
+  #
+  # +phase+ - :before or :after.
+  #
+  #: (Symbol) -> Array[Hash[Symbol, untyped]]
+  def self.guardrails_for(phase)
+    @guardrails ||= {before: [], after: []}
+    @guardrails[phase] || []
   end
 
   # The message history for the agent.
@@ -134,23 +171,36 @@ class Riffer::Agent
 
   # Generates a response from the agent.
   #
-  #: ((String | Array[Hash[Symbol, untyped] | Riffer::Messages::Base]), ?tool_context: Hash[Symbol, untyped]?) -> String
+  #: ((String | Array[Hash[Symbol, untyped] | Riffer::Messages::Base]), ?tool_context: Hash[Symbol, untyped]?) -> Riffer::Agent::Response
   def generate(prompt_or_messages, tool_context: nil)
     @tool_context = tool_context
     @resolved_tools = nil
     initialize_messages(prompt_or_messages)
 
+    all_modifications = [] #: Array[Riffer::Guardrails::Modification]
+
+    tripwire, modifications = run_before_guardrails
+    all_modifications.concat(modifications)
+    return build_response("", tripwire: tripwire, modifications: all_modifications) if tripwire
+
     loop do
       response = call_llm
-      add_message(response)
+
       track_token_usage(response.token_usage)
 
-      break unless has_tool_calls?(response)
+      processed_response, tripwire, modifications = run_after_guardrails(response)
+      all_modifications.concat(modifications)
 
-      execute_tool_calls(response)
+      return build_response("", tripwire: tripwire, modifications: all_modifications) if tripwire
+
+      add_message(processed_response)
+
+      break unless has_tool_calls?(processed_response)
+
+      execute_tool_calls(processed_response)
     end
 
-    extract_final_response
+    build_response(extract_final_response, modifications: all_modifications)
   end
 
   # Streams a response from the agent.
@@ -162,6 +212,14 @@ class Riffer::Agent
     initialize_messages(prompt_or_messages)
 
     Enumerator.new do |yielder|
+      tripwire, modifications = run_before_guardrails
+      modifications.each { |m| yielder << Riffer::StreamEvents::GuardrailModification.new(m) }
+
+      if tripwire
+        yielder << Riffer::StreamEvents::GuardrailTripwire.new(tripwire)
+        next
+      end
+
       loop do
         accumulated_content = ""
         accumulated_tool_calls = []
@@ -198,12 +256,22 @@ class Riffer::Agent
           tool_calls: accumulated_tool_calls,
           token_usage: accumulated_token_usage
         )
-        add_message(response)
+
         track_token_usage(accumulated_token_usage)
 
-        break unless has_tool_calls?(response)
+        processed_response, tripwire, modifications = run_after_guardrails(response)
+        modifications.each { |m| yielder << Riffer::StreamEvents::GuardrailModification.new(m) }
 
-        execute_tool_calls(response)
+        if tripwire
+          yielder << Riffer::StreamEvents::GuardrailTripwire.new(tripwire)
+          break
+        end
+
+        add_message(processed_response)
+
+        break unless has_tool_calls?(processed_response)
+
+        execute_tool_calls(processed_response)
       end
     end
   end
@@ -352,5 +420,35 @@ class Riffer::Agent
   def extract_final_response
     last_assistant_message = @messages.reverse.find { |msg| msg.is_a?(Riffer::Messages::Assistant) }
     last_assistant_message&.content || ""
+  end
+
+  #: () -> [Riffer::Guardrails::Tripwire?, Array[Riffer::Guardrails::Modification]]
+  def run_before_guardrails
+    guardrails = self.class.guardrails_for(:before)
+    return [nil, []] if guardrails.empty?
+
+    runner = Riffer::Guardrails::Runner.new(guardrails, phase: :before, context: @tool_context)
+    processed_messages, tripwire, modifications = runner.run(@messages)
+    @messages = processed_messages unless tripwire
+    [tripwire, modifications]
+  end
+
+  #: (Riffer::Messages::Assistant) -> [untyped, Riffer::Guardrails::Tripwire?, Array[Riffer::Guardrails::Modification]]
+  def run_after_guardrails(response)
+    guardrails = self.class.guardrails_for(:after)
+    return [response, nil, []] if guardrails.empty?
+
+    runner = Riffer::Guardrails::Runner.new(guardrails, phase: :after, context: @tool_context)
+    processed_response, tripwire, modifications = runner.run(response, messages: @messages)
+
+    response_index = @messages.length
+    modifications.each { |m| m.message_indices.map! { response_index } }
+
+    [processed_response, tripwire, modifications]
+  end
+
+  #: (String, ?tripwire: Riffer::Guardrails::Tripwire?, ?modifications: Array[Riffer::Guardrails::Modification]) -> Riffer::Agent::Response
+  def build_response(content, tripwire: nil, modifications: [])
+    Riffer::Agent::Response.new(content, tripwire: tripwire, modifications: modifications)
   end
 end
