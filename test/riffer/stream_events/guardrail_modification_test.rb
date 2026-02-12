@@ -5,7 +5,7 @@ require "test_helper"
 describe Riffer::StreamEvents::GuardrailModification do
   let(:modification) do
     Riffer::Guardrails::Modification.new(
-      guardrail_id: "pii_redactor",
+      guardrail: Riffer::Guardrail,
       phase: :before,
       message_indices: [0, 1]
     )
@@ -18,10 +18,10 @@ describe Riffer::StreamEvents::GuardrailModification do
     end
   end
 
-  describe "#guardrail_id" do
+  describe "#guardrail" do
     it "delegates to modification" do
       event = Riffer::StreamEvents::GuardrailModification.new(modification)
-      expect(event.guardrail_id).must_equal "pii_redactor"
+      expect(event.guardrail).must_equal Riffer::Guardrail
     end
   end
 
@@ -59,7 +59,8 @@ describe Riffer::StreamEvents::GuardrailModification do
 
     it "includes modification hash" do
       event = Riffer::StreamEvents::GuardrailModification.new(modification)
-      expect(event.to_h[:modification][:guardrail_id]).must_equal "pii_redactor"
+      expect(event.to_h[:modification][:guardrail]).must_be_kind_of String
+      expect(event.to_h[:modification][:guardrail]).wont_be_empty
     end
 
     it "includes phase in modification hash" do
