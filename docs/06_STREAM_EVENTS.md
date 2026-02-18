@@ -143,6 +143,30 @@ end
 
 See [Guardrails](09_GUARDRAILS.md) for more information.
 
+### Interrupt
+
+Emitted when an `on_message` callback interrupts the agent loop via `throw :riffer_interrupt`. This is the streaming equivalent of `Response#interrupted?` in generate mode.
+
+```ruby
+event = Riffer::StreamEvents::Interrupt.new(reason: "needs approval")
+event.role    # => :system
+event.reason  # => "needs approval"
+event.to_h    # => {role: :system, interrupt: true, reason: "needs approval"}
+```
+
+The `reason` is `nil` when `throw :riffer_interrupt` is called without a second argument.
+
+```ruby
+agent.stream("Hello").each do |event|
+  case event
+  when Riffer::StreamEvents::Interrupt
+    puts "Loop was interrupted: #{event.reason}"
+  end
+end
+```
+
+After an interrupt, use `resume_stream` to continue the loop. See [Agents - Interrupting the Agent Loop](03_AGENTS.md#interrupting-the-agent-loop) for details.
+
 ### TokenUsageDone
 
 Emitted when token usage data is available at the end of a response:
@@ -218,6 +242,9 @@ agent.stream("What's the weather in Tokyo and New York?").each do |event|
 
   when Riffer::StreamEvents::ReasoningDone
     puts "\n[reasoning complete]"
+
+  when Riffer::StreamEvents::Interrupt
+    puts "\n[interrupted]"
   end
 end
 ```

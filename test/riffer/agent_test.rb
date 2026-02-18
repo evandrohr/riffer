@@ -1274,6 +1274,516 @@ describe Riffer::Agent do
     end
   end
 
+  describe "interruptible callbacks with #generate" do
+    it "returns response with interrupted? true" do
+      agent = agent_class.new
+      agent.on_message { |_msg| throw :riffer_interrupt }
+      result = agent.generate("Hello")
+      expect(result.interrupted?).must_equal true
+    end
+
+    it "returns accumulated content" do
+      agent = agent_class.new
+      agent.on_message { |_msg| throw :riffer_interrupt }
+      result = agent.generate("Hello")
+      expect(result.content).must_be_instance_of String
+    end
+
+    it "captures interrupt reason" do
+      agent = agent_class.new
+      agent.on_message { |_msg| throw :riffer_interrupt, "needs approval" }
+      result = agent.generate("Hello")
+      expect(result.interrupted?).must_equal true
+      expect(result.interrupt_reason).must_equal "needs approval"
+    end
+
+    it "returns nil interrupt_reason when no reason given" do
+      agent = agent_class.new
+      agent.on_message { |_msg| throw :riffer_interrupt }
+      result = agent.generate("Hello")
+      expect(result.interrupt_reason).must_be_nil
+    end
+
+    describe "throw during tool execution" do
+      let(:tool_class) do
+        Class.new(Riffer::Tool) do
+          description "Simple tool"
+          def call(context:)
+            text("done")
+          end
+        end.tap { |t| t.identifier("interrupt_partial_tool") }
+      end
+
+      it "stops tool execution on interrupt and resumes pending tools" do
+        tc = tool_class
+        custom_agent_class = Class.new(Riffer::Agent) do
+          model "test/riffer-1"
+          uses_tools [tc]
+        end
+
+        agent = custom_agent_class.new
+        provider = agent.send(:provider_instance)
+        provider.stub_response("", tool_calls: [
+          {name: "interrupt_partial_tool", arguments: "{}"},
+          {name: "interrupt_partial_tool", arguments: "{}"}
+        ])
+        provider.stub_response("Done!")
+
+        tool_count = 0
+        agent.on_message do |msg|
+          if msg.is_a?(Riffer::Messages::Tool)
+            tool_count += 1
+            throw :riffer_interrupt if tool_count == 1
+          end
+        end
+
+        result = agent.generate("Call tools")
+
+        expect(result.interrupted?).must_equal true
+        tool_messages = agent.messages.select { |m| m.is_a?(Riffer::Messages::Tool) }
+        expect(tool_messages.length).must_equal 1
+
+        result = agent.resume
+        expect(result.interrupted?).must_equal false
+        tool_messages = agent.messages.select { |m| m.is_a?(Riffer::Messages::Tool) }
+        expect(tool_messages.length).must_equal 2
+      end
+
+      it "resumes all pending tools when interrupt fires on assistant callback" do
+        tc = tool_class
+        custom_agent_class = Class.new(Riffer::Agent) do
+          model "test/riffer-1"
+          uses_tools [tc]
+        end
+
+        agent = custom_agent_class.new
+        provider = agent.send(:provider_instance)
+        provider.stub_response("", tool_calls: [
+          {name: "interrupt_partial_tool", arguments: "{}"},
+          {name: "interrupt_partial_tool", arguments: "{}"}
+        ])
+        provider.stub_response("Done!")
+
+        interrupted_once = false
+        agent.on_message do |msg|
+          if msg.is_a?(Riffer::Messages::Assistant) && !interrupted_once
+            interrupted_once = true
+            throw :riffer_interrupt
+          end
+        end
+
+        result = agent.generate("Call tools")
+
+        expect(result.interrupted?).must_equal true
+        tool_messages = agent.messages.select { |m| m.is_a?(Riffer::Messages::Tool) }
+        expect(tool_messages.length).must_equal 0
+
+        result = agent.resume
+        expect(result.interrupted?).must_equal false
+        tool_messages = agent.messages.select { |m| m.is_a?(Riffer::Messages::Tool) }
+        expect(tool_messages.length).must_equal 2
+      end
+    end
+
+    describe "multiple callbacks where later one throws" do
+      it "earlier callbacks still fire" do
+        agent = agent_class.new
+        first_called = false
+        agent.on_message { |_msg| first_called = true }
+        agent.on_message { |_msg| throw :riffer_interrupt }
+        agent.generate("Hello")
+        expect(first_called).must_equal true
+      end
+    end
+  end
+
+  describe "#resume" do
+    it "re-enters loop without prior interruption" do
+      agent = agent_class.new
+      agent.generate("Hello")
+      result = agent.resume
+      expect(result).must_be_instance_of Riffer::Agent::Response
+      expect(result.interrupted?).must_equal false
+    end
+
+    it "returns a Response" do
+      agent = agent_class.new
+      interrupted_once = false
+      agent.on_message do |_msg|
+        unless interrupted_once
+          interrupted_once = true
+          throw :riffer_interrupt
+        end
+      end
+      agent.generate("Hello")
+      result = agent.resume
+      expect(result).must_be_instance_of Riffer::Agent::Response
+    end
+
+    it "returns non-interrupted response on successful resume" do
+      agent = agent_class.new
+      interrupted_once = false
+      agent.on_message do |_msg|
+        unless interrupted_once
+          interrupted_once = true
+          throw :riffer_interrupt
+        end
+      end
+      agent.generate("Hello")
+      result = agent.resume
+      expect(result.interrupted?).must_equal false
+    end
+
+    it "returns nil interrupt_reason on successful resume" do
+      agent = agent_class.new
+      interrupted_once = false
+      agent.on_message do |_msg|
+        unless interrupted_once
+          interrupted_once = true
+          throw :riffer_interrupt, "needs approval"
+        end
+      end
+      agent.generate("Hello")
+      result = agent.resume
+      expect(result.interrupt_reason).must_be_nil
+    end
+
+    it "preserves messages from original generate" do
+      agent = agent_class.new
+      interrupted_once = false
+      agent.on_message do |_msg|
+        unless interrupted_once
+          interrupted_once = true
+          throw :riffer_interrupt
+        end
+      end
+      agent.generate("Hello")
+      messages_before = agent.messages.length
+      agent.resume
+      expect(agent.messages.length).must_be :>, messages_before
+    end
+
+    it "does not duplicate system message" do
+      agent = agent_class.new
+      interrupted_once = false
+      agent.on_message do |_msg|
+        unless interrupted_once
+          interrupted_once = true
+          throw :riffer_interrupt
+        end
+      end
+      agent.generate("Hello")
+      agent.resume
+      system_messages = agent.messages.select { |m| m.is_a?(Riffer::Messages::System) }
+      expect(system_messages.length).must_equal 1
+    end
+
+    describe "with tools" do
+      let(:tool_class) do
+        Class.new(Riffer::Tool) do
+          description "Gets the weather"
+          params do
+            required :city, String
+          end
+          def call(context:, city:)
+            text("Weather in #{city}: 20 degrees")
+          end
+        end.tap { |t| t.identifier("resume_weather_tool") }
+      end
+
+      it "completes tool loop after resume" do
+        tc = tool_class
+        custom_agent_class = Class.new(Riffer::Agent) do
+          model "test/riffer-1"
+          uses_tools [tc]
+        end
+
+        agent = custom_agent_class.new
+        provider = agent.send(:provider_instance)
+        provider.stub_response("", tool_calls: [
+          {name: "resume_weather_tool", arguments: '{"city":"Toronto"}'}
+        ])
+        provider.stub_response("The weather is nice!")
+
+        interrupted_once = false
+        agent.on_message do |msg|
+          if msg.is_a?(Riffer::Messages::Tool) && !interrupted_once
+            interrupted_once = true
+            throw :riffer_interrupt
+          end
+        end
+
+        result = agent.generate("What's the weather?")
+        expect(result.interrupted?).must_equal true
+
+        result = agent.resume
+        expect(result.interrupted?).must_equal false
+        expect(result.content).must_equal "The weather is nice!"
+      end
+    end
+
+    describe "with persisted messages" do
+      it "resumes from message objects" do
+        agent = agent_class.new
+        messages = [
+          Riffer::Messages::System.new("You are a helpful assistant."),
+          Riffer::Messages::User.new("Hello"),
+          Riffer::Messages::Assistant.new("Hi there!")
+        ]
+        result = agent.resume(messages: messages)
+        expect(result).must_be_instance_of Riffer::Agent::Response
+      end
+
+      it "resumes from hashes" do
+        agent = agent_class.new
+        messages = [
+          {role: "system", content: "You are a helpful assistant."},
+          {role: "user", content: "Hello"},
+          {role: "assistant", content: "Hi there!"}
+        ]
+        result = agent.resume(messages: messages)
+        expect(result).must_be_instance_of Riffer::Agent::Response
+      end
+
+      it "does not require prior interruption" do
+        agent = agent_class.new
+        messages = [
+          Riffer::Messages::User.new("Hello")
+        ]
+        result = agent.resume(messages: messages)
+        expect(result.interrupted?).must_equal false
+      end
+
+      it "sets tool_context" do
+        context_tool = Class.new(Riffer::Tool) do
+          description "Gets user info"
+          params do
+            required :field, String
+          end
+          def call(context:, field:)
+            text(context[field.to_sym] || "unknown")
+          end
+        end.tap { |t| t.identifier("resume_context_tool") }
+
+        tc = context_tool
+        custom_agent_class = Class.new(Riffer::Agent) do
+          model "test/riffer-1"
+          uses_tools [tc]
+        end
+
+        agent = custom_agent_class.new
+        provider = agent.send(:provider_instance)
+        provider.stub_response("", tool_calls: [
+          {name: "resume_context_tool", arguments: '{"field":"user_name"}'}
+        ])
+        provider.stub_response("Your name is Alice!")
+
+        messages = [Riffer::Messages::User.new("Get my name")]
+        agent.resume(messages: messages, tool_context: {user_name: "Alice"})
+
+        tool_messages = agent.messages.select { |m| m.is_a?(Riffer::Messages::Tool) }
+        expect(tool_messages.first.content).must_equal "Alice"
+      end
+
+      it "does not prepend system message" do
+        agent = agent_class.new
+        messages = [
+          Riffer::Messages::System.new("Custom instructions."),
+          Riffer::Messages::User.new("Hello")
+        ]
+        agent.resume(messages: messages)
+        system_messages = agent.messages.select { |m| m.is_a?(Riffer::Messages::System) }
+        expect(system_messages.length).must_equal 1
+        expect(system_messages.first.content).must_equal "Custom instructions."
+      end
+    end
+  end
+
+  describe "#resume_stream" do
+    it "re-enters loop without prior interruption" do
+      agent = agent_class.new
+      agent.generate("Hello")
+      events = agent.resume_stream.to_a
+      text_events = events.select { |e| e.is_a?(Riffer::StreamEvents::TextDelta) }
+      expect(text_events).wont_be_empty
+    end
+
+    it "returns an Enumerator" do
+      agent = agent_class.new
+      interrupted_once = false
+      agent.on_message do |_msg|
+        unless interrupted_once
+          interrupted_once = true
+          throw :riffer_interrupt
+        end
+      end
+      agent.generate("Hello")
+      result = agent.resume_stream
+      expect(result).must_be_instance_of Enumerator
+    end
+
+    it "yields stream events on in-memory resume" do
+      agent = agent_class.new
+      interrupted_once = false
+      agent.on_message do |_msg|
+        unless interrupted_once
+          interrupted_once = true
+          throw :riffer_interrupt
+        end
+      end
+      agent.generate("Hello")
+      events = agent.resume_stream.to_a
+      text_events = events.select { |e| e.is_a?(Riffer::StreamEvents::TextDelta) }
+      expect(text_events).wont_be_empty
+    end
+
+    it "does not yield Interrupt event on successful resume" do
+      agent = agent_class.new
+      interrupted_once = false
+      agent.on_message do |_msg|
+        unless interrupted_once
+          interrupted_once = true
+          throw :riffer_interrupt
+        end
+      end
+      agent.generate("Hello")
+      events = agent.resume_stream.to_a
+      interrupt_event = events.find { |e| e.is_a?(Riffer::StreamEvents::Interrupt) }
+      expect(interrupt_event).must_be_nil
+    end
+
+    describe "with persisted messages" do
+      it "resumes from message objects" do
+        agent = agent_class.new
+        messages = [
+          Riffer::Messages::System.new("You are a helpful assistant."),
+          Riffer::Messages::User.new("Hello")
+        ]
+        events = agent.resume_stream(messages: messages).to_a
+        text_events = events.select { |e| e.is_a?(Riffer::StreamEvents::TextDelta) }
+        expect(text_events).wont_be_empty
+      end
+
+      it "resumes from hashes" do
+        agent = agent_class.new
+        messages = [
+          {role: "system", content: "You are a helpful assistant."},
+          {role: "user", content: "Hello"}
+        ]
+        events = agent.resume_stream(messages: messages).to_a
+        expect(events).wont_be_empty
+      end
+
+      it "does not require prior interruption" do
+        agent = agent_class.new
+        messages = [Riffer::Messages::User.new("Hello")]
+        events = agent.resume_stream(messages: messages).to_a
+        interrupt_event = events.find { |e| e.is_a?(Riffer::StreamEvents::Interrupt) }
+        expect(interrupt_event).must_be_nil
+      end
+    end
+  end
+
+  describe "pending tool calls on fresh generate" do
+    it "does not execute pending tool calls" do
+      tool_class = Class.new(Riffer::Tool) do
+        description "Simple tool"
+        def call(context:)
+          text("done")
+        end
+      end.tap { |t| t.identifier("fresh_generate_tool") }
+
+      tc = tool_class
+      custom_agent_class = Class.new(Riffer::Agent) do
+        model "test/riffer-1"
+        uses_tools [tc]
+      end
+
+      agent = custom_agent_class.new
+      provider = agent.send(:provider_instance)
+      provider.stub_response("", tool_calls: [
+        {name: "fresh_generate_tool", arguments: "{}"}
+      ])
+      provider.stub_response("Done!")
+
+      result = agent.generate("Call tool")
+      expect(result.interrupted?).must_equal false
+      tool_messages = agent.messages.select { |m| m.is_a?(Riffer::Messages::Tool) }
+      expect(tool_messages.length).must_equal 1
+    end
+  end
+
+  describe "pending tool call resume with #stream" do
+    it "resumes pending tools in streaming mode" do
+      tool_class = Class.new(Riffer::Tool) do
+        description "Simple tool"
+        def call(context:)
+          text("done")
+        end
+      end.tap { |t| t.identifier("stream_pending_tool") }
+
+      tc = tool_class
+      custom_agent_class = Class.new(Riffer::Agent) do
+        model "test/riffer-1"
+        uses_tools [tc]
+      end
+
+      agent = custom_agent_class.new
+      provider = agent.send(:provider_instance)
+      provider.stub_response("", tool_calls: [
+        {name: "stream_pending_tool", arguments: "{}"},
+        {name: "stream_pending_tool", arguments: "{}"}
+      ])
+      provider.stub_response("Done!")
+
+      tool_count = 0
+      agent.on_message do |msg|
+        if msg.is_a?(Riffer::Messages::Tool)
+          tool_count += 1
+          throw :riffer_interrupt if tool_count == 1
+        end
+      end
+
+      events = agent.stream("Call tools").to_a
+      interrupt_event = events.find { |e| e.is_a?(Riffer::StreamEvents::Interrupt) }
+      expect(interrupt_event).wont_be_nil
+      tool_messages = agent.messages.select { |m| m.is_a?(Riffer::Messages::Tool) }
+      expect(tool_messages.length).must_equal 1
+
+      events = agent.resume_stream.to_a
+      interrupt_event = events.find { |e| e.is_a?(Riffer::StreamEvents::Interrupt) }
+      expect(interrupt_event).must_be_nil
+      tool_messages = agent.messages.select { |m| m.is_a?(Riffer::Messages::Tool) }
+      expect(tool_messages.length).must_equal 2
+    end
+  end
+
+  describe "interruptible callbacks with #stream" do
+    it "yields Interrupt event" do
+      agent = agent_class.new
+      agent.on_message { |_msg| throw :riffer_interrupt }
+      events = agent.stream("Hello").to_a
+      interrupt_event = events.find { |e| e.is_a?(Riffer::StreamEvents::Interrupt) }
+      expect(interrupt_event).wont_be_nil
+    end
+
+    it "yields Interrupt event with reason" do
+      agent = agent_class.new
+      agent.on_message { |_msg| throw :riffer_interrupt, "budget exceeded" }
+      events = agent.stream("Hello").to_a
+      interrupt_event = events.find { |e| e.is_a?(Riffer::StreamEvents::Interrupt) }
+      expect(interrupt_event.reason).must_equal "budget exceeded"
+    end
+
+    it "yields Interrupt event with nil reason when none given" do
+      agent = agent_class.new
+      agent.on_message { |_msg| throw :riffer_interrupt }
+      events = agent.stream("Hello").to_a
+      interrupt_event = events.find { |e| e.is_a?(Riffer::StreamEvents::Interrupt) }
+      expect(interrupt_event.reason).must_be_nil
+    end
+  end
+
   describe "message emit with #stream" do
     describe "on simple stream" do
       let(:emitted) { [] }

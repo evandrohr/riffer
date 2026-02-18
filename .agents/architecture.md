@@ -44,6 +44,21 @@ Structured events for streaming responses:
 - `TextDone` - completion signals
 - `ReasoningDelta` - reasoning process chunks
 - `ReasoningDone` - reasoning completion
+- `Interrupt` - callback interrupted the agent loop
+
+### Stopping the Loop Early
+
+Two mechanisms can stop the agent loop before the LLM finishes naturally:
+
+**Guardrail tripwires** — declarative policy enforcement registered at class level. A `:before` guardrail can block the request before the LLM is called; an `:after` guardrail can block the response. Tripwires are not resumable — the caller must change the input and start over. `Response#blocked?` returns `true`.
+
+**Callback interrupts** — imperative flow control via `on_message` callbacks. Use `throw :riffer_interrupt` to pause the loop at any point. `Response#interrupted?` returns `true`. In streaming, yields an `Interrupt` event.
+
+### Resuming After an Interrupt
+
+`agent.resume` or `agent.resume_stream` continues an interrupted loop. Both accept `messages:` for cross-process resume from persisted data.
+
+On resume, `execute_pending_tool_calls` detects tool calls from the last assistant message that lack corresponding tool result messages and executes them before entering the LLM loop. This handles the case where an interrupt fired mid-way through tool execution.
 
 ## Key Patterns
 
@@ -84,6 +99,7 @@ lib/
       test.rb            # Test provider
     stream_events/
       base.rb            # Base stream event
+      interrupt.rb       # Interrupt event
       text_delta.rb      # Text delta event
       text_done.rb       # Text done event
       reasoning_delta.rb # Reasoning delta event

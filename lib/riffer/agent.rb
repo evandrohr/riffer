@@ -158,6 +158,7 @@ class Riffer::Agent
     @messages = []
     @message_callbacks = []
     @token_usage = nil
+    @interrupted = false
     @model_string = self.class.model
     @instructions_text = self.class.instructions
 
@@ -175,6 +176,7 @@ class Riffer::Agent
   def generate(prompt_or_messages, tool_context: nil)
     @tool_context = tool_context
     @resolved_tools = nil
+    @interrupted = false
     initialize_messages(prompt_or_messages)
 
     all_modifications = [] #: Array[Riffer::Guardrails::Modification]
@@ -183,24 +185,7 @@ class Riffer::Agent
     all_modifications.concat(modifications)
     return build_response("", tripwire: tripwire, modifications: all_modifications) if tripwire
 
-    loop do
-      response = call_llm
-
-      track_token_usage(response.token_usage)
-
-      processed_response, tripwire, modifications = run_after_guardrails(response)
-      all_modifications.concat(modifications)
-
-      return build_response("", tripwire: tripwire, modifications: all_modifications) if tripwire
-
-      add_message(processed_response)
-
-      break unless has_tool_calls?(processed_response)
-
-      execute_tool_calls(processed_response)
-    end
-
-    build_response(extract_final_response, modifications: all_modifications)
+    run_generate_loop(all_modifications)
   end
 
   # Streams a response from the agent.
@@ -209,6 +194,7 @@ class Riffer::Agent
   def stream(prompt_or_messages, tool_context: nil)
     @tool_context = tool_context
     @resolved_tools = nil
+    @interrupted = false
     initialize_messages(prompt_or_messages)
 
     Enumerator.new do |yielder|
@@ -219,6 +205,121 @@ class Riffer::Agent
         yielder << Riffer::StreamEvents::GuardrailTripwire.new(tripwire)
         next
       end
+
+      run_stream_loop(yielder)
+    end
+  end
+
+  # Resumes an agent loop.
+  #
+  # When called without +messages+, continues using the existing in-memory
+  # message history. When called with +messages+, reconstructs the agent
+  # state from persisted data (useful for cross-process resume).
+  #
+  # Skips message initialization and before guardrails in both cases.
+  #
+  #: (?messages: Array[Hash[Symbol, untyped] | Riffer::Messages::Base]?, ?tool_context: Hash[Symbol, untyped]?) -> Riffer::Agent::Response
+  def resume(messages: nil, tool_context: nil)
+    restore_state(messages: messages, tool_context: tool_context)
+    run_generate_loop(resume: true)
+  end
+
+  # Resumes an agent loop in streaming mode.
+  #
+  # Same as +resume+ but returns an Enumerator yielding stream events.
+  #
+  #: (?messages: Array[Hash[Symbol, untyped] | Riffer::Messages::Base]?, ?tool_context: Hash[Symbol, untyped]?) -> Enumerator[Riffer::StreamEvents::Base, void]
+  def resume_stream(messages: nil, tool_context: nil)
+    restore_state(messages: messages, tool_context: tool_context)
+
+    Enumerator.new do |yielder|
+      run_stream_loop(yielder, resume: true)
+    end
+  end
+
+  # Registers a callback to be invoked when messages are added during generation.
+  #
+  # Raises Riffer::ArgumentError if no block is given.
+  #
+  #: () { (Riffer::Messages::Base) -> void } -> self
+  def on_message(&block)
+    raise Riffer::ArgumentError, "on_message requires a block" unless block_given?
+    @message_callbacks << block
+    self
+  end
+
+  private
+
+  #: (?Array[Riffer::Guardrails::Modification], ?resume: bool) -> Riffer::Agent::Response
+  def run_generate_loop(all_modifications = [], resume: false)
+    reason = catch(:riffer_interrupt) do
+      execute_pending_tool_calls if resume
+
+      loop do
+        response = call_llm
+
+        track_token_usage(response.token_usage)
+
+        processed_response, tripwire, modifications = run_after_guardrails(response)
+        all_modifications.concat(modifications)
+
+        return build_response("", tripwire: tripwire, modifications: all_modifications) if tripwire
+
+        add_message(processed_response)
+
+        break unless has_tool_calls?(processed_response)
+
+        execute_tool_calls(processed_response)
+      end
+
+      return build_response(extract_final_response, modifications: all_modifications)
+    end
+
+    # catch returns the thrown value when throw :riffer_interrupt fires;
+    # the return above exits on the successful (non-interrupted) path.
+    @interrupted = true
+    build_response(extract_final_response, modifications: all_modifications, interrupted: true, interrupt_reason: reason)
+  end
+
+  #: (Riffer::Messages::Base) -> void
+  def add_message(message)
+    @messages << message
+    @message_callbacks.each { |callback| callback.call(message) }
+  end
+
+  #: (Riffer::TokenUsage?) -> void
+  def track_token_usage(usage)
+    return unless usage
+
+    @token_usage = @token_usage ? @token_usage + usage : usage
+  end
+
+  #: ((String | Array[Hash[Symbol, untyped] | Riffer::Messages::Base])) -> void
+  def initialize_messages(prompt_or_messages)
+    @messages = []
+    @messages << Riffer::Messages::System.new(@instructions_text) if @instructions_text
+
+    if prompt_or_messages.is_a?(Array)
+      prompt_or_messages.each do |item|
+        @messages << convert_to_message_object(item)
+      end
+    else
+      @messages << Riffer::Messages::User.new(prompt_or_messages)
+    end
+  end
+
+  #: (?messages: Array[Hash[Symbol, untyped] | Riffer::Messages::Base]?, ?tool_context: Hash[Symbol, untyped]?) -> void
+  def restore_state(messages: nil, tool_context: nil)
+    @messages = messages.map { |item| convert_to_message_object(item) } if messages
+    @tool_context = tool_context if tool_context
+    @interrupted = false
+    @resolved_tools = nil
+  end
+
+  #: (Enumerator::Yielder, ?resume: bool) -> void
+  def run_stream_loop(yielder, resume: false)
+    completed = catch(:riffer_interrupt) do
+      execute_pending_tool_calls if resume
 
       loop do
         accumulated_content = ""
@@ -273,46 +374,12 @@ class Riffer::Agent
 
         execute_tool_calls(processed_response)
       end
+      :completed
     end
-  end
 
-  # Registers a callback to be invoked when messages are added during generation.
-  #
-  # Raises Riffer::ArgumentError if no block is given.
-  #
-  #: () { (Riffer::Messages::Base) -> void } -> self
-  def on_message(&block)
-    raise Riffer::ArgumentError, "on_message requires a block" unless block_given?
-    @message_callbacks << block
-    self
-  end
-
-  private
-
-  #: (Riffer::Messages::Base) -> void
-  def add_message(message)
-    @messages << message
-    @message_callbacks.each { |callback| callback.call(message) }
-  end
-
-  #: (Riffer::TokenUsage?) -> void
-  def track_token_usage(usage)
-    return unless usage
-
-    @token_usage = @token_usage ? @token_usage + usage : usage
-  end
-
-  #: ((String | Array[Hash[Symbol, untyped] | Riffer::Messages::Base])) -> void
-  def initialize_messages(prompt_or_messages)
-    @messages = []
-    @messages << Riffer::Messages::System.new(@instructions_text) if @instructions_text
-
-    if prompt_or_messages.is_a?(Array)
-      prompt_or_messages.each do |item|
-        @messages << convert_to_message_object(item)
-      end
-    else
-      @messages << Riffer::Messages::User.new(prompt_or_messages)
+    unless completed == :completed
+      @interrupted = true
+      yielder << Riffer::StreamEvents::Interrupt.new(reason: completed)
     end
   end
 
@@ -353,6 +420,44 @@ class Riffer::Agent
   #: (Riffer::Messages::Assistant) -> void
   def execute_tool_calls(response)
     response.tool_calls.each do |tool_call|
+      result = execute_tool_call(tool_call)
+      add_message(Riffer::Messages::Tool.new(
+        result.content,
+        tool_call_id: tool_call.id,
+        name: tool_call.name,
+        error: result.error_message,
+        error_type: result.error_type
+      ))
+    end
+  end
+
+  # Executes tool calls left unfinished by a prior interrupt.
+  #
+  # When an interrupt fires mid-way through tool execution, some tool calls
+  # from the last assistant message may not have been executed yet. This
+  # method detects those gaps by comparing the tool call ids requested by the
+  # last assistant message against the tool result messages that follow it,
+  # then executes any that are missing.
+  #
+  #: () -> void
+  def execute_pending_tool_calls
+    # Find the most recent assistant message (the one whose tool calls
+    # may be partially executed).
+    last_assistant_idx = @messages.rindex { |m| m.is_a?(Riffer::Messages::Assistant) }
+    return unless last_assistant_idx
+
+    assistant = @messages[last_assistant_idx]
+    return if assistant.tool_calls.empty?
+
+    # Collect ids of tool calls that already have a result message
+    # after the assistant message.
+    executed_ids = @messages[(last_assistant_idx + 1)..].select { |m|
+      m.is_a?(Riffer::Messages::Tool)
+    }.map(&:tool_call_id)
+
+    # Execute any tool calls whose id is not in the executed set.
+    assistant.tool_calls.each do |tool_call|
+      next if executed_ids.include?(tool_call.id)
       result = execute_tool_call(tool_call)
       add_message(Riffer::Messages::Tool.new(
         result.content,
@@ -447,8 +552,8 @@ class Riffer::Agent
     [processed_response, tripwire, modifications]
   end
 
-  #: (String, ?tripwire: Riffer::Guardrails::Tripwire?, ?modifications: Array[Riffer::Guardrails::Modification]) -> Riffer::Agent::Response
-  def build_response(content, tripwire: nil, modifications: [])
-    Riffer::Agent::Response.new(content, tripwire: tripwire, modifications: modifications)
+  #: (String, ?tripwire: Riffer::Guardrails::Tripwire?, ?modifications: Array[Riffer::Guardrails::Modification], ?interrupted: bool, ?interrupt_reason: String?) -> Riffer::Agent::Response
+  def build_response(content, tripwire: nil, modifications: [], interrupted: false, interrupt_reason: nil)
+    Riffer::Agent::Response.new(content, tripwire: tripwire, modifications: modifications, interrupted: interrupted, interrupt_reason: interrupt_reason)
   end
 end
