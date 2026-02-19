@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 # rbs_inline: enabled
 
-require "json"
-
 # Amazon Bedrock provider for Claude and other foundation models.
 #
 # Requires the +aws-sdk-bedrockruntime+ gem to be installed.
@@ -32,8 +30,8 @@ class Riffer::Providers::AmazonBedrock < Riffer::Providers::Base
 
   private
 
-  #: (Array[Riffer::Messages::Base], model: String, **untyped) -> Riffer::Messages::Assistant
-  def perform_generate_text(messages, model:, **options)
+  #: (Array[Riffer::Messages::Base], String?, Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+  def build_request_params(messages, model, options)
     partitioned_messages = partition_messages(messages)
     tools = options[:tools]
 
@@ -50,158 +48,12 @@ class Riffer::Providers::AmazonBedrock < Riffer::Providers::Base
       }
     end
 
-    response = @client.converse(**params)
-    extract_assistant_message(response, extract_token_usage(response))
+    params
   end
 
-  #: (Array[Riffer::Messages::Base], model: String, **untyped) -> Enumerator[Riffer::StreamEvents::Base, void]
-  def perform_stream_text(messages, model:, **options)
-    Enumerator.new do |yielder|
-      partitioned_messages = partition_messages(messages)
-      tools = options[:tools]
-
-      params = {
-        model_id: model,
-        system: partitioned_messages[:system],
-        messages: partitioned_messages[:conversation],
-        **options.except(:tools)
-      }
-
-      if tools && !tools.empty?
-        params[:tool_config] = {
-          tools: tools.map { |t| convert_tool_to_bedrock_format(t) }
-        }
-      end
-
-      accumulated_text = ""
-      current_tool_use = nil
-
-      @client.converse_stream(**params) do |stream|
-        stream.on_content_block_start_event do |event|
-          if event.start&.tool_use
-            tool_use = event.start.tool_use
-            current_tool_use = {
-              id: tool_use.tool_use_id,
-              name: tool_use.name,
-              arguments: ""
-            }
-          end
-        end
-
-        stream.on_content_block_delta_event do |event|
-          if event.delta&.text
-            delta_text = event.delta.text
-            accumulated_text += delta_text
-            yielder << Riffer::StreamEvents::TextDelta.new(delta_text)
-          elsif event.delta&.tool_use
-            input_delta = event.delta.tool_use.input
-            if current_tool_use && input_delta
-              current_tool_use[:arguments] += input_delta
-              yielder << Riffer::StreamEvents::ToolCallDelta.new(
-                item_id: current_tool_use[:id],
-                name: current_tool_use[:name],
-                arguments_delta: input_delta
-              )
-            end
-          end
-        end
-
-        stream.on_content_block_stop_event do |_event|
-          if current_tool_use
-            yielder << Riffer::StreamEvents::ToolCallDone.new(
-              item_id: current_tool_use[:id],
-              call_id: current_tool_use[:id],
-              name: current_tool_use[:name],
-              arguments: current_tool_use[:arguments]
-            )
-            current_tool_use = nil
-          end
-        end
-
-        stream.on_message_stop_event do |_event|
-          yielder << Riffer::StreamEvents::TextDone.new(accumulated_text)
-        end
-
-        stream.on_metadata_event do |event|
-          if event.usage
-            usage = event.usage
-            yielder << Riffer::StreamEvents::TokenUsageDone.new(
-              token_usage: Riffer::TokenUsage.new(
-                input_tokens: usage.input_tokens,
-                output_tokens: usage.output_tokens,
-                cache_creation_tokens: usage.cache_write_input_tokens,
-                cache_read_tokens: usage.cache_read_input_tokens
-              )
-            )
-          end
-        end
-      end
-    end
-  end
-
-  #: (Array[Riffer::Messages::Base]) -> Hash[Symbol, untyped]
-  def partition_messages(messages)
-    system_prompts = []
-    conversation_messages = []
-
-    messages.each do |message|
-      case message
-      when Riffer::Messages::System
-        system_prompts << {text: message.content}
-      when Riffer::Messages::User
-        conversation_messages << {role: "user", content: [{text: message.content}]}
-      when Riffer::Messages::Assistant
-        conversation_messages << convert_assistant_to_bedrock_format(message)
-      when Riffer::Messages::Tool
-        append_tool_result(conversation_messages, message)
-      end
-    end
-
-    {
-      system: system_prompts,
-      conversation: conversation_messages
-    }
-  end
-
-  #: (Array[Hash[Symbol, untyped]], Riffer::Messages::Tool) -> void
-  def append_tool_result(conversation_messages, message)
-    tool_result = {
-      tool_result: {
-        tool_use_id: message.tool_call_id,
-        content: [{text: message.content}]
-      }
-    }
-
-    prev = conversation_messages.last
-    if prev && prev[:role] == "user" && prev[:content]&.first&.key?(:tool_result)
-      prev[:content] << tool_result
-    else
-      conversation_messages << {role: "user", content: [tool_result]}
-    end
-  end
-
-  #: (Riffer::Messages::Assistant) -> Hash[Symbol, untyped]
-  def convert_assistant_to_bedrock_format(message)
-    content = []
-    content << {text: message.content} if message.content && !message.content.empty?
-
-    message.tool_calls.each do |tc|
-      content << {
-        tool_use: {
-          tool_use_id: tc.id || tc.call_id,
-          name: tc.name,
-          input: parse_tool_arguments(tc.arguments)
-        }
-      }
-    end
-
-    {role: "assistant", content: content}
-  end
-
-  #: ((String | Hash[String, untyped])?) -> Hash[String, untyped]
-  def parse_tool_arguments(arguments)
-    return {} if arguments.nil? || arguments.empty?
-    arguments.is_a?(String) ? JSON.parse(arguments) : arguments
+  #: (Hash[Symbol, untyped]) -> Aws::BedrockRuntime::Types::ConverseResponse
+  def execute_generate(params)
+    @client.converse(**params)
   end
 
   #: (Aws::BedrockRuntime::Types::ConverseResponse) -> Riffer::TokenUsage?
@@ -246,6 +98,150 @@ class Riffer::Providers::AmazonBedrock < Riffer::Providers::Base
     end
 
     Riffer::Messages::Assistant.new(text_content, tool_calls: tool_calls, token_usage: token_usage)
+  end
+
+  #: (Hash[Symbol, untyped], Enumerator::Yielder) -> void
+  def execute_stream(params, yielder)
+    current_state = {
+      text: nil,
+      tool_call: nil
+    }
+
+    @client.converse_stream(**params) do |stream|
+      stream.on_event do |event|
+        case event.event_type
+        when :content_block_start
+          handle_content_block_start_tool_use(event, state: current_state, yielder: yielder) if event.start&.tool_use
+        when :content_block_delta
+          handle_content_block_delta_text_delta(event, state: current_state, yielder: yielder) if event.delta&.text
+          handle_content_block_delta_tool_use(event, state: current_state, yielder: yielder) if event.delta&.tool_use
+        when :content_block_stop
+          handle_content_block_stop_text_delta(event, state: current_state, yielder: yielder) if current_state[:text]
+          handle_content_block_stop_tool_use(event, state: current_state, yielder: yielder) if current_state[:tool_call]
+        when :metadata
+          handle_metadata_usage(event, state: current_state, yielder: yielder) if event.usage
+        end
+      end
+    end
+  end
+
+  #: (Aws::BedrockRuntime::Types::ContentBlockStartEvent, state: Hash[Symbol, untyped], yielder: Enumerator[Riffer::StreamEvents::Base, void]) -> void
+  def handle_content_block_start_tool_use(event, state:, yielder:)
+    state[:tool_call] = {
+      id: event.start.tool_use.tool_use_id,
+      name: event.start.tool_use.name,
+      arguments: ""
+    }
+  end
+
+  #: (Aws::BedrockRuntime::Types::ContentBlockDeltaEvent, state: Hash[Symbol, untyped], yielder: Enumerator[Riffer::StreamEvents::Base, void]) -> void
+  def handle_content_block_delta_text_delta(event, state:, yielder:)
+    delta_text = event.delta.text
+    state[:text] ||= ""
+    state[:text] += delta_text
+    yielder << Riffer::StreamEvents::TextDelta.new(delta_text)
+  end
+
+  #: (Aws::BedrockRuntime::Types::ContentBlockDeltaEvent, state: Hash[Symbol, untyped], yielder: Enumerator[Riffer::StreamEvents::Base, void]) -> void
+  def handle_content_block_delta_tool_use(event, state:, yielder:)
+    input_delta = event.delta.tool_use.input
+
+    state[:tool_call][:arguments] += input_delta
+
+    yielder << Riffer::StreamEvents::ToolCallDelta.new(
+      item_id: state[:tool_call][:id],
+      name: state[:tool_call][:name],
+      arguments_delta: input_delta
+    )
+  end
+
+  #: (Aws::BedrockRuntime::Types::ContentBlockStopEvent, state: Hash[Symbol, untyped], yielder: Enumerator[Riffer::StreamEvents::Base, void]) -> void
+  def handle_content_block_stop_text_delta(_event, state:, yielder:)
+    yielder << Riffer::StreamEvents::TextDone.new(state[:text])
+    state[:text] = nil
+  end
+
+  #: (Aws::BedrockRuntime::Types::ContentBlockStopEvent, state: Hash[Symbol, untyped], yielder: Enumerator[Riffer::StreamEvents::Base, void]) -> void
+  def handle_content_block_stop_tool_use(_event, state:, yielder:)
+    tool_call = state[:tool_call]
+    yielder << Riffer::StreamEvents::ToolCallDone.new(
+      item_id: tool_call[:id],
+      call_id: tool_call[:id],
+      name: tool_call[:name],
+      arguments: tool_call[:arguments]
+    )
+    state[:tool_call] = nil
+  end
+
+  #: (Aws::BedrockRuntime::Types::ConverseStreamMetadataEvent, state: Hash[Symbol, untyped], yielder: Enumerator[Riffer::StreamEvents::Base, void]) -> void
+  def handle_metadata_usage(event, state:, yielder:)
+    yielder << Riffer::StreamEvents::TokenUsageDone.new(
+      token_usage: Riffer::TokenUsage.new(
+        input_tokens: event.usage.input_tokens,
+        output_tokens: event.usage.output_tokens,
+        cache_creation_tokens: event.usage.cache_write_input_tokens,
+        cache_read_tokens: event.usage.cache_read_input_tokens
+      )
+    )
+  end
+
+  #: (Array[Riffer::Messages::Base]) -> Hash[Symbol, untyped]
+  def partition_messages(messages)
+    system_prompts = []
+    conversation_messages = []
+
+    messages.each do |message|
+      case message
+      when Riffer::Messages::System
+        system_prompts << {text: message.content}
+      when Riffer::Messages::User
+        conversation_messages << {role: "user", content: [{text: message.content}]}
+      when Riffer::Messages::Assistant
+        conversation_messages << convert_assistant_to_bedrock_format(message)
+      when Riffer::Messages::Tool
+        append_tool_result(conversation_messages, message)
+      end
+    end
+
+    {
+      system: system_prompts,
+      conversation: conversation_messages
+    }
+  end
+
+  #: (Riffer::Messages::Assistant) -> Hash[Symbol, untyped]
+  def convert_assistant_to_bedrock_format(message)
+    content = []
+    content << {text: message.content} if message.content && !message.content.empty?
+
+    message.tool_calls.each do |tc|
+      content << {
+        tool_use: {
+          tool_use_id: tc.id || tc.call_id,
+          name: tc.name,
+          input: parse_tool_arguments(tc.arguments)
+        }
+      }
+    end
+
+    {role: "assistant", content: content}
+  end
+
+  #: (Array[Hash[Symbol, untyped]], Riffer::Messages::Tool) -> void
+  def append_tool_result(conversation_messages, message)
+    tool_result = {
+      tool_result: {
+        tool_use_id: message.tool_call_id,
+        content: [{text: message.content}]
+      }
+    }
+
+    prev = conversation_messages.last
+    if prev && prev[:role] == "user" && prev[:content]&.first&.key?(:tool_result)
+      prev[:content] << tool_result
+    else
+      conversation_messages << {role: "user", content: [tool_result]}
+    end
   end
 
   #: (singleton(Riffer::Tool)) -> Hash[Symbol, untyped]

@@ -17,25 +17,7 @@ class Riffer::Providers::OpenAI < Riffer::Providers::Base
 
   private
 
-  #: (Array[Riffer::Messages::Base], model: String, **untyped) -> Riffer::Messages::Assistant
-  def perform_generate_text(messages, model:, **options)
-    params = build_request_params(messages, model, options)
-    response = @client.responses.create(params)
-
-    extract_assistant_message(response.output, extract_token_usage(response))
-  end
-
-  #: (Array[Riffer::Messages::Base], model: String, **untyped) -> Enumerator[Riffer::StreamEvents::Base, void]
-  def perform_stream_text(messages, model:, **options)
-    Enumerator.new do |yielder|
-      params = build_request_params(messages, model, options)
-      stream = @client.responses.stream(params)
-
-      process_stream_events(stream, yielder)
-    end
-  end
-
-  #: (Array[Riffer::Messages::Base], String, Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+  #: (Array[Riffer::Messages::Base], String?, Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
   def build_request_params(messages, model, options)
     reasoning = options[:reasoning]
     tools = options[:tools]
@@ -55,6 +37,142 @@ class Riffer::Providers::OpenAI < Riffer::Providers::Base
     end
 
     params.compact
+  end
+
+  #: (Hash[Symbol, untyped]) -> OpenAI::Models::Responses::Response
+  def execute_generate(params)
+    @client.responses.create(params)
+  end
+
+  #: (OpenAI::Models::Responses::Response) -> Riffer::TokenUsage?
+  def extract_token_usage(response)
+    usage = response.usage
+    return nil unless usage
+
+    Riffer::TokenUsage.new(
+      input_tokens: usage.input_tokens,
+      output_tokens: usage.output_tokens
+    )
+  end
+
+  #: (OpenAI::Models::Responses::Response, ?Riffer::TokenUsage?) -> Riffer::Messages::Assistant
+  def extract_assistant_message(response, token_usage = nil)
+    output_items = response.output
+
+    text_content = ""
+    tool_calls = []
+
+    output_items.each do |item|
+      case item.type
+      when :message
+        text_block = item.content&.find { |c| c.type == :output_text }
+        text_content = text_block&.text || "" if text_block
+      when :function_call
+        tool_calls << Riffer::Messages::Assistant::ToolCall.new(
+          id: item.id,
+          call_id: item.call_id,
+          name: item.name,
+          arguments: item.arguments
+        )
+      end
+    end
+
+    if text_content.empty? && tool_calls.empty?
+      raise Riffer::Error, "No output returned from OpenAI API"
+    end
+
+    Riffer::Messages::Assistant.new(text_content, tool_calls: tool_calls, token_usage: token_usage)
+  end
+
+  #: (Hash[Symbol, untyped], Enumerator::Yielder) -> void
+  def execute_stream(params, yielder)
+    current_state = {
+      tool_info: {}
+    }
+
+    stream = @client.responses.stream(params)
+    stream.each do |event|
+      case event.type
+      when :"response.output_item.added"
+        handle_output_item_added_function_call(event, state: current_state, yielder: yielder) if event.item&.type == :function_call
+      when :"response.output_text.delta"
+        handle_output_text_delta(event, state: current_state, yielder: yielder)
+      when :"response.output_text.done"
+        handle_output_text_done(event, state: current_state, yielder: yielder)
+      when :"response.reasoning_summary_text.delta"
+        handle_reasoning_summary_text_delta(event, state: current_state, yielder: yielder)
+      when :"response.reasoning_summary_text.done"
+        handle_reasoning_summary_text_done(event, state: current_state, yielder: yielder)
+      when :"response.function_call_arguments.delta"
+        handle_function_call_arguments_delta(event, state: current_state, yielder: yielder)
+      when :"response.function_call_arguments.done"
+        handle_function_call_arguments_done(event, state: current_state, yielder: yielder)
+      when :"response.completed"
+        handle_response_completed(event, state: current_state, yielder: yielder)
+      end
+    end
+  end
+
+  #: (untyped, state: Hash[Symbol, untyped], yielder: Enumerator::Yielder) -> void
+  def handle_output_item_added_function_call(event, state:, yielder:)
+    state[:tool_info][event.item.id] = {
+      name: event.item.name,
+      call_id: event.item.call_id
+    }
+  end
+
+  #: (untyped, state: Hash[Symbol, untyped], yielder: Enumerator::Yielder) -> void
+  def handle_output_text_delta(event, state:, yielder:)
+    yielder << Riffer::StreamEvents::TextDelta.new(event.delta)
+  end
+
+  #: (untyped, state: Hash[Symbol, untyped], yielder: Enumerator::Yielder) -> void
+  def handle_output_text_done(event, state:, yielder:)
+    yielder << Riffer::StreamEvents::TextDone.new(event.text)
+  end
+
+  #: (untyped, state: Hash[Symbol, untyped], yielder: Enumerator::Yielder) -> void
+  def handle_reasoning_summary_text_delta(event, state:, yielder:)
+    yielder << Riffer::StreamEvents::ReasoningDelta.new(event.delta)
+  end
+
+  #: (untyped, state: Hash[Symbol, untyped], yielder: Enumerator::Yielder) -> void
+  def handle_reasoning_summary_text_done(event, state:, yielder:)
+    yielder << Riffer::StreamEvents::ReasoningDone.new(event.text)
+  end
+
+  #: (untyped, state: Hash[Symbol, untyped], yielder: Enumerator::Yielder) -> void
+  def handle_function_call_arguments_delta(event, state:, yielder:)
+    tracked = state[:tool_info][event.item_id] || {}
+    yielder << Riffer::StreamEvents::ToolCallDelta.new(
+      item_id: event.item_id,
+      name: tracked[:name],
+      arguments_delta: event.delta
+    )
+  end
+
+  #: (untyped, state: Hash[Symbol, untyped], yielder: Enumerator::Yielder) -> void
+  def handle_function_call_arguments_done(event, state:, yielder:)
+    tracked = state[:tool_info][event.item_id] || {}
+    yielder << Riffer::StreamEvents::ToolCallDone.new(
+      item_id: event.item_id,
+      call_id: tracked[:call_id] || event.item_id,
+      name: tracked[:name],
+      arguments: event.arguments
+    )
+  end
+
+  #: (untyped, state: Hash[Symbol, untyped], yielder: Enumerator::Yielder) -> void
+  def handle_response_completed(event, state:, yielder:)
+    usage = event.response&.usage
+    return unless usage
+
+    yielder << Riffer::StreamEvents::TokenUsageDone.new(
+      token_usage: Riffer::TokenUsage.new(
+        input_tokens: usage.input_tokens,
+        output_tokens: usage.output_tokens
+      )
+    )
   end
 
   #: (Array[Riffer::Messages::Base]) -> Array[Hash[Symbol, untyped]]
@@ -94,108 +212,6 @@ class Riffer::Providers::OpenAI < Riffer::Providers::Base
         }
       end
       items
-    end
-  end
-
-  #: (OpenAI::Models::Responses::Response) -> Riffer::TokenUsage?
-  def extract_token_usage(response)
-    usage = response.usage
-    return nil unless usage
-
-    Riffer::TokenUsage.new(
-      input_tokens: usage.input_tokens,
-      output_tokens: usage.output_tokens
-    )
-  end
-
-  #: (Array[OpenAI::Models::Responses::response_output_item], ?Riffer::TokenUsage?) -> Riffer::Messages::Assistant
-  def extract_assistant_message(output_items, token_usage = nil)
-    text_content = ""
-    tool_calls = []
-
-    output_items.each do |item|
-      case item.type
-      when :message
-        text_block = item.content&.find { |c| c.type == :output_text }
-        text_content = text_block&.text || "" if text_block
-      when :function_call
-        tool_calls << Riffer::Messages::Assistant::ToolCall.new(
-          id: item.id,
-          call_id: item.call_id,
-          name: item.name,
-          arguments: item.arguments
-        )
-      end
-    end
-
-    if text_content.empty? && tool_calls.empty?
-      raise Riffer::Error, "No output returned from OpenAI API"
-    end
-
-    Riffer::Messages::Assistant.new(text_content, tool_calls: tool_calls, token_usage: token_usage)
-  end
-
-  #: (OpenAI::Internal::Stream[OpenAI::Models::Responses::response_stream_event], Enumerator::Yielder) -> void
-  def process_stream_events(stream, yielder)
-    tool_info = {}
-
-    stream.each do |raw_event|
-      track_tool_info(raw_event, tool_info)
-      event = convert_event(raw_event, tool_info)
-
-      next unless event
-
-      yielder << event if event
-    end
-  end
-
-  #: (OpenAI::Models::Responses::response_stream_event, Hash[String, Hash[Symbol, untyped]]) -> void
-  def track_tool_info(event, tool_info)
-    return unless event.type == :"response.output_item.added"
-    return unless event.item&.type == :function_call
-
-    tool_info[event.item.id] = {
-      name: event.item.name,
-      call_id: event.item.call_id
-    }
-  end
-
-  #: (OpenAI::Models::Responses::response_stream_event, ?Hash[String, Hash[Symbol, untyped]]) -> Riffer::StreamEvents::Base?
-  def convert_event(event, tool_info = {})
-    case event.type
-    when :"response.output_text.delta"
-      Riffer::StreamEvents::TextDelta.new(event.delta)
-    when :"response.output_text.done"
-      Riffer::StreamEvents::TextDone.new(event.text)
-    when :"response.reasoning_summary_text.delta"
-      Riffer::StreamEvents::ReasoningDelta.new(event.delta)
-    when :"response.reasoning_summary_text.done"
-      Riffer::StreamEvents::ReasoningDone.new(event.text)
-    when :"response.function_call_arguments.delta"
-      tracked = tool_info[event.item_id] || {}
-      Riffer::StreamEvents::ToolCallDelta.new(
-        item_id: event.item_id,
-        name: tracked[:name],
-        arguments_delta: event.delta
-      )
-    when :"response.function_call_arguments.done"
-      tracked = tool_info[event.item_id] || {}
-      Riffer::StreamEvents::ToolCallDone.new(
-        item_id: event.item_id,
-        call_id: tracked[:call_id] || event.item_id,
-        name: tracked[:name],
-        arguments: event.arguments
-      )
-    when :"response.completed"
-      usage = event.response&.usage
-      if usage
-        Riffer::StreamEvents::TokenUsageDone.new(
-          token_usage: Riffer::TokenUsage.new(
-            input_tokens: usage.input_tokens,
-            output_tokens: usage.output_tokens
-          )
-        )
-      end
     end
   end
 
