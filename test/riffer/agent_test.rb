@@ -586,6 +586,137 @@ describe Riffer::Agent do
     end
   end
 
+  describe ".structured_output" do
+    it "returns nil when not set" do
+      expect(agent_class.structured_output).must_be_nil
+    end
+
+    it "stores Params instance" do
+      params = Riffer::Params.new
+      params.required(:sentiment, String)
+      klass = Class.new(Riffer::Agent) do
+        model "test/riffer-1"
+      end
+      klass.structured_output(params)
+      expect(klass.structured_output).must_equal params
+    end
+
+    it "stores Params from block DSL" do
+      klass = Class.new(Riffer::Agent) do
+        model "test/riffer-1"
+        structured_output do
+          required :sentiment, String, description: "The sentiment"
+          optional :score, Float
+        end
+      end
+      expect(klass.structured_output).must_be_instance_of Riffer::Params
+      expect(klass.structured_output.parameters.size).must_equal 2
+    end
+
+    it "raises ArgumentError for non-Params argument" do
+      klass = Class.new(Riffer::Agent) do
+        model "test/riffer-1"
+      end
+      error = expect { klass.structured_output({sentiment: String}) }.must_raise(Riffer::ArgumentError)
+      expect(error.message).must_match(/structured_output must be a Riffer::Params/)
+    end
+  end
+
+  describe "#generate with structured_output" do
+    it "returns Response with parsed structured_output from class-level schema" do
+      klass = Class.new(Riffer::Agent) do
+        model "test/riffer-1"
+        structured_output do
+          required :sentiment, String
+          required :score, Float
+        end
+      end
+
+      agent = klass.new
+      provider = agent.send(:provider_instance)
+      provider.stub_response('{"sentiment":"positive","score":0.9}')
+
+      result = agent.generate("Analyze sentiment")
+      expect(result.structured_output).must_equal({sentiment: "positive", score: 0.9})
+    end
+
+    it "sets structured_output to nil when LLM returns invalid JSON" do
+      klass = Class.new(Riffer::Agent) do
+        model "test/riffer-1"
+        structured_output do
+          required :sentiment, String
+        end
+      end
+
+      agent = klass.new
+      provider = agent.send(:provider_instance)
+      provider.stub_response("This is not JSON")
+
+      result = agent.generate("Analyze sentiment")
+      expect(result.structured_output).must_be_nil
+    end
+
+    it "preserves raw content when structured_output parsing fails" do
+      klass = Class.new(Riffer::Agent) do
+        model "test/riffer-1"
+        structured_output do
+          required :sentiment, String
+        end
+      end
+
+      agent = klass.new
+      provider = agent.send(:provider_instance)
+      provider.stub_response("This is not JSON")
+
+      result = agent.generate("Analyze sentiment")
+      expect(result.content).must_equal "This is not JSON"
+    end
+
+    it "works with Params instance at class level" do
+      params = Riffer::Params.new
+      params.required(:sentiment, String)
+
+      klass = Class.new(Riffer::Agent) do
+        model "test/riffer-1"
+        structured_output params
+      end
+
+      agent = klass.new
+      provider = agent.send(:provider_instance)
+      provider.stub_response('{"sentiment":"positive"}')
+
+      result = agent.generate("Analyze")
+      expect(result.structured_output).must_equal({sentiment: "positive"})
+    end
+
+    it "returns nil structured_output when structured_output is not configured" do
+      agent = agent_class.new
+      result = agent.generate("Hello")
+      expect(result.structured_output).must_be_nil
+    end
+  end
+
+  describe "#stream with structured_output" do
+    it "raises ArgumentError when class-level structured_output is configured" do
+      klass = Class.new(Riffer::Agent) do
+        model "test/riffer-1"
+        structured_output do
+          required :sentiment, String
+        end
+      end
+
+      agent = klass.new
+      error = expect { agent.stream("Hello") }.must_raise(Riffer::ArgumentError)
+      expect(error.message).must_match(/Structured output is not supported with streaming/)
+    end
+
+    it "works normally without structured_output" do
+      agent = agent_class.new
+      result = agent.stream("Hello")
+      expect(result).must_be_instance_of Enumerator
+    end
+  end
+
   describe "instructions validation" do
     it "raises error when instructions is empty string" do
       error = expect do

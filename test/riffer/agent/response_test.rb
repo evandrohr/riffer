@@ -76,6 +76,18 @@ describe Riffer::Agent::Response do
     end
   end
 
+  describe "#structured_output" do
+    it "defaults to nil" do
+      response = Riffer::Agent::Response.new("Hello!")
+      expect(response.structured_output).must_be_nil
+    end
+
+    it "stores the structured output" do
+      response = Riffer::Agent::Response.new("Hello!", structured_output: {sentiment: "positive", score: 0.9})
+      expect(response.structured_output).must_equal({sentiment: "positive", score: 0.9})
+    end
+  end
+
   describe "#interrupted?" do
     it "returns false by default" do
       response = Riffer::Agent::Response.new("Hello!")

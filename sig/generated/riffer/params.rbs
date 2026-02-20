@@ -1,15 +1,16 @@
-# Generated from lib/riffer/tools/params.rb with RBS::Inline
+# Generated from lib/riffer/params.rb with RBS::Inline
 
-# Riffer::Tools::Params provides a DSL for defining tool parameters.
+# Riffer::Params provides a DSL for defining parameters.
 #
-# Used within a Tool's +params+ block to define required and optional parameters.
+# Used within a Tool's +params+ block to define required and optional parameters,
+# and by StructuredOutput to define response schemas.
 #
 #   params do
 #     required :city, String, description: "The city name"
 #     optional :units, String, default: "celsius", enum: ["celsius", "fahrenheit"]
 #   end
-class Riffer::Tools::Params
-  attr_reader parameters: Array[Riffer::Tools::Param]
+class Riffer::Params
+  attr_reader parameters: Array[Riffer::Param]
 
   # : () -> void
   def initialize: () -> void

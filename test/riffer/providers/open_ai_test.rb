@@ -103,6 +103,90 @@ describe Riffer::Providers::OpenAI do
       end
     end
 
+    describe "structured output" do
+      it "returns an Assistant message" do
+        VCR.use_cassette("Riffer_Providers_OpenAI/_generate_text/structured_output/returns_structured_json") do
+          provider = Riffer::Providers::OpenAI.new(api_key: api_key)
+          params = Riffer::Params.new
+          params.required(:sentiment, String)
+          params.required(:score, Float)
+          structured_output = Riffer::StructuredOutput.new(params)
+          result = provider.generate_text(
+            prompt: "Analyze the sentiment of the following text: 'I love this product, it is amazing!'",
+            model: "gpt-5-nano",
+            structured_output: structured_output
+          )
+          expect(result).must_be_instance_of Riffer::Messages::Assistant
+        end
+      end
+
+      it "returns non-empty content" do
+        VCR.use_cassette("Riffer_Providers_OpenAI/_generate_text/structured_output/returns_structured_json") do
+          provider = Riffer::Providers::OpenAI.new(api_key: api_key)
+          params = Riffer::Params.new
+          params.required(:sentiment, String)
+          params.required(:score, Float)
+          structured_output = Riffer::StructuredOutput.new(params)
+          result = provider.generate_text(
+            prompt: "Analyze the sentiment of the following text: 'I love this product, it is amazing!'",
+            model: "gpt-5-nano",
+            structured_output: structured_output
+          )
+          expect(result.content).wont_be_empty
+        end
+      end
+
+      it "returns valid JSON content" do
+        VCR.use_cassette("Riffer_Providers_OpenAI/_generate_text/structured_output/returns_structured_json") do
+          provider = Riffer::Providers::OpenAI.new(api_key: api_key)
+          params = Riffer::Params.new
+          params.required(:sentiment, String)
+          params.required(:score, Float)
+          structured_output = Riffer::StructuredOutput.new(params)
+          result = provider.generate_text(
+            prompt: "Analyze the sentiment of the following text: 'I love this product, it is amazing!'",
+            model: "gpt-5-nano",
+            structured_output: structured_output
+          )
+          JSON.parse(result.content)
+        end
+      end
+
+      it "includes sentiment key" do
+        VCR.use_cassette("Riffer_Providers_OpenAI/_generate_text/structured_output/returns_structured_json") do
+          provider = Riffer::Providers::OpenAI.new(api_key: api_key)
+          params = Riffer::Params.new
+          params.required(:sentiment, String)
+          params.required(:score, Float)
+          structured_output = Riffer::StructuredOutput.new(params)
+          result = provider.generate_text(
+            prompt: "Analyze the sentiment of the following text: 'I love this product, it is amazing!'",
+            model: "gpt-5-nano",
+            structured_output: structured_output
+          )
+          parsed = JSON.parse(result.content)
+          expect(parsed.key?("sentiment")).must_equal true
+        end
+      end
+
+      it "includes score key" do
+        VCR.use_cassette("Riffer_Providers_OpenAI/_generate_text/structured_output/returns_structured_json") do
+          provider = Riffer::Providers::OpenAI.new(api_key: api_key)
+          params = Riffer::Params.new
+          params.required(:sentiment, String)
+          params.required(:score, Float)
+          structured_output = Riffer::StructuredOutput.new(params)
+          result = provider.generate_text(
+            prompt: "Analyze the sentiment of the following text: 'I love this product, it is amazing!'",
+            model: "gpt-5-nano",
+            structured_output: structured_output
+          )
+          parsed = JSON.parse(result.content)
+          expect(parsed.key?("score")).must_equal true
+        end
+      end
+    end
+
     describe "without reasoning parameter" do
       it "does not include reasoning in request params" do
         VCR.use_cassette("Riffer_Providers_OpenAI/_generate_text/without_reasoning_parameter/does_not_include_reasoning") do
@@ -245,6 +329,78 @@ describe Riffer::Providers::OpenAI do
           expect(usage_done_index).must_be :>, text_done_index
         end
       end
+    end
+  end
+
+  describe "structured output" do
+    it "includes text.format in request params" do
+      provider = Riffer::Providers::OpenAI.new(api_key: api_key)
+      params = Riffer::Params.new
+      params.required(:sentiment, String)
+      params.required(:score, Float)
+      structured_output = Riffer::StructuredOutput.new(params)
+      messages = [Riffer::Messages::User.new("Analyze")]
+
+      params = provider.send(:build_request_params, messages, "gpt-5-nano", {structured_output: structured_output})
+
+      expect(params[:text][:format][:type]).must_equal "json_schema"
+    end
+
+    it "sets schema name to response" do
+      provider = Riffer::Providers::OpenAI.new(api_key: api_key)
+      params = Riffer::Params.new
+      params.required(:sentiment, String)
+      structured_output = Riffer::StructuredOutput.new(params)
+      messages = [Riffer::Messages::User.new("Analyze")]
+
+      params = provider.send(:build_request_params, messages, "gpt-5-nano", {structured_output: structured_output})
+
+      expect(params[:text][:format][:name]).must_equal "response"
+    end
+
+    it "sets strict to true" do
+      provider = Riffer::Providers::OpenAI.new(api_key: api_key)
+      params = Riffer::Params.new
+      params.required(:sentiment, String)
+      structured_output = Riffer::StructuredOutput.new(params)
+      messages = [Riffer::Messages::User.new("Analyze")]
+
+      params = provider.send(:build_request_params, messages, "gpt-5-nano", {structured_output: structured_output})
+
+      expect(params[:text][:format][:strict]).must_equal true
+    end
+
+    it "includes json_schema in format" do
+      provider = Riffer::Providers::OpenAI.new(api_key: api_key)
+      params = Riffer::Params.new
+      params.required(:sentiment, String)
+      structured_output = Riffer::StructuredOutput.new(params)
+      messages = [Riffer::Messages::User.new("Analyze")]
+
+      params = provider.send(:build_request_params, messages, "gpt-5-nano", {structured_output: structured_output})
+
+      expect(params[:text][:format][:schema][:type]).must_equal "object"
+    end
+
+    it "does not include text.format when not configured" do
+      provider = Riffer::Providers::OpenAI.new(api_key: api_key)
+      messages = [Riffer::Messages::User.new("Hello")]
+
+      params = provider.send(:build_request_params, messages, "gpt-5-nano", {})
+
+      expect(params[:text]).must_be_nil
+    end
+
+    it "does not pass structured_output through to API params" do
+      provider = Riffer::Providers::OpenAI.new(api_key: api_key)
+      params = Riffer::Params.new
+      params.required(:sentiment, String)
+      structured_output = Riffer::StructuredOutput.new(params)
+      messages = [Riffer::Messages::User.new("Analyze")]
+
+      params = provider.send(:build_request_params, messages, "gpt-5-nano", {structured_output: structured_output})
+
+      expect(params.key?(:structured_output)).must_equal false
     end
   end
 

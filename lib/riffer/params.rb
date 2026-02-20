@@ -1,17 +1,18 @@
 # frozen_string_literal: true
 # rbs_inline: enabled
 
-# Riffer::Tools::Params provides a DSL for defining tool parameters.
+# Riffer::Params provides a DSL for defining parameters.
 #
-# Used within a Tool's +params+ block to define required and optional parameters.
+# Used within a Tool's +params+ block to define required and optional parameters,
+# and by StructuredOutput to define response schemas.
 #
 #   params do
 #     required :city, String, description: "The city name"
 #     optional :units, String, default: "celsius", enum: ["celsius", "fahrenheit"]
 #   end
 #
-class Riffer::Tools::Params
-  attr_reader :parameters #: Array[Riffer::Tools::Param]
+class Riffer::Params
+  attr_reader :parameters #: Array[Riffer::Param]
 
   #: () -> void
   def initialize
@@ -22,7 +23,7 @@ class Riffer::Tools::Params
   #
   #: (Symbol, Class, ?description: String?, ?enum: Array[untyped]?) -> void
   def required(name, type, description: nil, enum: nil)
-    @parameters << Riffer::Tools::Param.new(
+    @parameters << Riffer::Param.new(
       name: name,
       type: type,
       required: true,
@@ -35,7 +36,7 @@ class Riffer::Tools::Params
   #
   #: (Symbol, Class, ?description: String?, ?enum: Array[untyped]?, ?default: untyped) -> void
   def optional(name, type, description: nil, enum: nil, default: nil)
-    @parameters << Riffer::Tools::Param.new(
+    @parameters << Riffer::Param.new(
       name: name,
       type: type,
       required: false,

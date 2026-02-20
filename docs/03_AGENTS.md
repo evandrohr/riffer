@@ -131,6 +131,26 @@ class MyAgent < Riffer::Agent
 end
 ```
 
+### structured_output
+
+Configures the agent to return structured JSON responses conforming to a schema. Accepts a `Riffer::Params` instance or a block DSL:
+
+```ruby
+class SentimentAgent < Riffer::Agent
+  model 'openai/gpt-4o'
+  instructions 'Analyze the sentiment of the given text.'
+  structured_output do
+    required :sentiment, String, description: "positive, negative, or neutral"
+    required :score, Float, description: "Confidence score between 0 and 1"
+    optional :explanation, String, description: "Brief explanation"
+  end
+end
+```
+
+The LLM response is automatically parsed and validated against the schema. Access the result via `response.structured_output`.
+
+Structured output is not compatible with streaming — calling `stream` on an agent with structured output configured raises `Riffer::ArgumentError`.
+
 ### guardrail
 
 Registers guardrails for pre/post processing of messages. Pass the guardrail class and any options:
@@ -360,6 +380,33 @@ end
 ```
 
 Returns `nil` if the provider doesn't report usage, or a `Riffer::TokenUsage` object with accumulated totals.
+
+## Response Attributes
+
+`Riffer::Agent::Response` is returned by `generate` and `resume`:
+
+| Attribute          | Type                        | Description                                        |
+| ------------------ | --------------------------- | -------------------------------------------------- |
+| `content`          | `String`                    | The response text                                  |
+| `structured_output` | `Hash` / `nil`              | Parsed and validated structured output (see below) |
+| `blocked?`         | `Boolean`                   | `true` if a guardrail tripwire fired               |
+| `tripwire`         | `Tripwire` / `nil`          | The guardrail tripwire that blocked the request    |
+| `modified?`        | `Boolean`                   | `true` if a guardrail modified the content         |
+| `modifications`    | `Array`                     | List of guardrail modifications applied            |
+| `interrupted?`     | `Boolean`                   | `true` if the loop was interrupted                 |
+| `interrupt_reason` | `String` / `Symbol` / `nil` | The reason passed to `throw :riffer_interrupt`     |
+
+### response.structured_output
+
+When structured output is configured, the LLM response is parsed as JSON and validated against the schema. The validated result is available as `response.structured_output`:
+
+```ruby
+response = SentimentAgent.generate('Analyze: "I love this!"')
+response.content            # => raw JSON string from the LLM
+response.structured_output  # => {sentiment: "positive", score: 0.95}
+```
+
+Returns `nil` when structured output is not configured or when validation fails.
 
 ## Class Methods
 
