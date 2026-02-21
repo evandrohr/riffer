@@ -13,6 +13,8 @@ class Riffer::Voice::Drivers::GeminiLive < Riffer::Voice::Drivers::Base
 
   DEFAULT_AUDIO_MIME_TYPE = "audio/pcm;rate=16000" #: String
   DEFAULT_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025" #: String
+  DEFAULT_RESPONSE_MODALITIES = ["AUDIO"].freeze #: Array[String]
+  UNSUPPORTED_SCHEMA_KEYS = ["additionalProperties"].freeze #: Array[String]
 
   #: (api_key: String?, ?model: String, ?endpoint: String, ?transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, ?parser: Riffer::Voice::Parsers::GeminiLiveParser, ?task_resolver: ^() -> untyped, ?logger: untyped) -> void
   def initialize(api_key: nil, model: DEFAULT_MODEL, endpoint: DEFAULT_ENDPOINT, transport_factory: nil, parser: Riffer::Voice::Parsers::GeminiLiveParser.new, task_resolver: nil, logger: nil)
@@ -145,7 +147,7 @@ class Riffer::Voice::Drivers::GeminiLive < Riffer::Voice::Drivers::Base
   def build_setup_payload(system_prompt:, tools:, config:)
     payload = {
       "setup" => {
-        "model" => model,
+        "model" => normalized_model,
         "systemInstruction" => {
           "parts" => [{"text" => system_prompt}]
         }
@@ -155,7 +157,7 @@ class Riffer::Voice::Drivers::GeminiLive < Riffer::Voice::Drivers::Base
     tool_declarations = normalize_gemini_tools(tools)
     payload["setup"]["tools"] = tool_declarations unless tool_declarations.empty?
 
-    config_hash = stringify_hash(config)
+    config_hash = normalize_connect_config(config)
     payload["setup"].merge!(config_hash) unless config_hash.empty?
 
     payload
@@ -163,21 +165,110 @@ class Riffer::Voice::Drivers::GeminiLive < Riffer::Voice::Drivers::Base
 
   #: (Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]) -> Array[Hash[String, untyped]]
   def normalize_gemini_tools(tools)
-    declarations = tools.filter_map do |tool|
+    declarations = tools.flat_map do |tool|
       if tool.is_a?(Class) && tool <= Riffer::Tool
-        {
-          "name" => tool.name,
-          "description" => tool.description,
-          "parameters" => tool.parameters_schema
-        }
+        [
+          sanitize_tool_definition(
+            {
+              "name" => tool.name,
+              "description" => tool.description,
+              "parameters" => tool.parameters_schema
+            }
+          )
+        ]
       elsif tool.is_a?(Hash)
-        stringify_hash(tool)
+        expand_hash_tool_definition(tool)
+      else
+        []
       end
     end
 
     return [] if declarations.empty?
 
     [{"functionDeclarations" => declarations}]
+  end
+
+  #: (Hash[Symbol | String, untyped]) -> Array[Hash[String, untyped]]
+  def expand_hash_tool_definition(tool)
+    payload = deep_stringify(tool)
+    function_declarations = payload["functionDeclarations"]
+    return [sanitize_tool_definition(payload)] unless function_declarations.is_a?(Array)
+
+    function_declarations.filter_map do |definition|
+      sanitize_tool_definition(definition) if definition.is_a?(Hash)
+    end
+  end
+
+  #: (Hash[Symbol | String, untyped]) -> Hash[String, untyped]
+  def normalize_connect_config(config)
+    deep_merge(
+      {
+        "generationConfig" => {
+          "responseModalities" => DEFAULT_RESPONSE_MODALITIES.dup
+        }
+      },
+      deep_stringify(config || {})
+    )
+  end
+
+  #: () -> String
+  def normalized_model
+    value = model.to_s
+    return value if value.start_with?("models/")
+
+    "models/#{value}"
+  end
+
+  #: (Hash[String, untyped]) -> Hash[String, untyped]
+  def sanitize_tool_definition(tool)
+    sanitized = tool.dup
+    parameters = sanitized["parameters"]
+    sanitized["parameters"] = sanitize_schema(parameters) if parameters.is_a?(Hash)
+    sanitized
+  end
+
+  #: (untyped) -> untyped
+  def sanitize_schema(value)
+    case value
+    when Hash
+      value.each_with_object({}) do |(key, nested_value), normalized|
+        string_key = key.to_s
+        next if UNSUPPORTED_SCHEMA_KEYS.include?(string_key)
+
+        normalized[string_key] = sanitize_schema(nested_value)
+      end
+    when Array
+      value.map { |item| sanitize_schema(item) }
+    else
+      value
+    end
+  end
+
+  #: (untyped) -> untyped
+  def deep_stringify(value)
+    case value
+    when Hash
+      value.each_with_object({}) do |(key, nested_value), result|
+        result[key.to_s] = deep_stringify(nested_value)
+      end
+    when Array
+      value.map { |item| deep_stringify(item) }
+    else
+      value
+    end
+  end
+
+  #: (Hash[String, untyped], Hash[String, untyped]) -> Hash[String, untyped]
+  def deep_merge(base, overrides)
+    merged = base.dup
+    overrides.each do |key, value|
+      merged[key] = if merged[key].is_a?(Hash) && value.is_a?(Hash)
+        deep_merge(merged[key], value)
+      else
+        value
+      end
+    end
+    merged
   end
 
   #: () -> void

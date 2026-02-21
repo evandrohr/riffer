@@ -21,8 +21,23 @@ describe Riffer::Voice::Drivers::GeminiLive do
 
     expect(connected).must_equal true
     expect(driver).must_be :connected?
-    expect(transport.writes.first.dig("setup", "model")).must_equal "gemini-2.5-flash-native-audio-preview-12-2025"
+    expect(transport.writes.first.dig("setup", "model")).must_equal "models/gemini-2.5-flash-native-audio-preview-12-2025"
+    expect(transport.writes.first.dig("setup", "generationConfig", "responseModalities")).must_equal ["AUDIO"]
     expect(async_task.children.size).must_equal 1
+  end
+
+  it "does not duplicate models prefix when model is already prefixed" do
+    driver = Riffer::Voice::Drivers::GeminiLive.new(
+      api_key: "test-key",
+      model: "models/gemini-2.5-flash-native-audio-preview-12-2025",
+      transport_factory: transport_factory,
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    driver.connect(system_prompt: "You are helpful")
+
+    expect(transport.writes.first.dig("setup", "model")).must_equal "models/gemini-2.5-flash-native-audio-preview-12-2025"
   end
 
   it "emits parser events from the reader loop" do
@@ -70,6 +85,65 @@ describe Riffer::Voice::Drivers::GeminiLive do
     )
     expect(transport.writes[2].dig("clientContent", "turns", 0, "parts", 0, "text")).must_equal "hello"
     expect(transport.writes[3].dig("toolResponse", "functionResponses", 0, "id")).must_equal "call_1"
+  end
+
+  it "merges provided config over defaults" do
+    driver = Riffer::Voice::Drivers::GeminiLive.new(
+      api_key: "test-key",
+      model: "gemini-2.5-flash-native-audio-preview-12-2025",
+      transport_factory: transport_factory,
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    driver.connect(
+      system_prompt: "You are helpful",
+      config: {
+        generationConfig: {
+          responseModalities: ["TEXT"],
+          temperature: 0.2
+        }
+      }
+    )
+
+    expect(transport.writes.first.dig("setup", "generationConfig", "responseModalities")).must_equal ["TEXT"]
+    expect(transport.writes.first.dig("setup", "generationConfig", "temperature")).must_equal 0.2
+  end
+
+  it "removes unsupported schema keys from tool definitions" do
+    custom_tool = {
+      functionDeclarations: [
+        {
+          name: "find_patient",
+          description: "Find patient",
+          parameters: {
+            type: "object",
+            properties: {
+              phone: {
+                type: "string",
+                additionalProperties: false
+              }
+            },
+            required: ["phone"],
+            additionalProperties: false
+          }
+        }
+      ]
+    }
+
+    driver = Riffer::Voice::Drivers::GeminiLive.new(
+      api_key: "test-key",
+      model: "gemini-2.5-flash-native-audio-preview-12-2025",
+      transport_factory: transport_factory,
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    driver.connect(system_prompt: "You are helpful", tools: [custom_tool])
+
+    parameters = transport.writes.first.dig("setup", "tools", 0, "functionDeclarations", 0, "parameters")
+    expect(parameters.key?("additionalProperties")).must_equal false
+    expect(parameters.dig("properties", "phone", "additionalProperties")).must_be_nil
   end
 
   it "emits callback_error when callback raises" do
