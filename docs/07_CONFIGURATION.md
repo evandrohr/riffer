@@ -48,6 +48,11 @@ Riffer.configure do |config|
 end
 ```
 
+This key is used by:
+
+- `Riffer::Providers::OpenAI` for text generation and streaming
+- `Riffer::Voice::Drivers::OpenAIRealtime` for realtime voice sessions
+
 ### Amazon Bedrock
 
 | Option      | Description                                  |
@@ -89,6 +94,18 @@ end
 ```
 
 This key is used by `Riffer::Voice::Drivers::GeminiLive` for realtime voice sessions.
+
+## Realtime Voice Runtime Dependencies
+
+Realtime voice drivers require an Async runtime and websocket libraries at runtime:
+
+```ruby
+gem 'async'
+gem 'async-http'
+gem 'async-websocket'
+```
+
+If these gems are missing, `Riffer::Voice::Transports::AsyncWebsocket` raises a dependency load error when connecting.
 
 ## Agent-Level Configuration
 

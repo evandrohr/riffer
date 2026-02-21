@@ -23,6 +23,8 @@ Riffer also includes realtime voice drivers under `Riffer::Voice::Drivers`.
 
 Voice drivers are separate from text providers (`Riffer::Providers`) and use an event-based callback contract.
 
+Gemini support is currently available through the realtime voice driver (`gemini_live`). A `Riffer::Providers::Gemini` text provider is not part of this release.
+
 ## Model String Format
 
 Agents specify providers using the `provider/model` format:
@@ -178,5 +180,6 @@ Riffer::Providers::Repository.find(:mock)
 - [OpenAI](04_OPENAI.md) - GPT models
 - [Mock](05_MOCK_PROVIDER.md) - Mock provider for testing
 - [Custom Providers](06_CUSTOM_PROVIDERS.md) - Creating your own provider
-- [Realtime Voice Plan](../docs/10_REALTIME_VOICE_PLAN.md) - Voice architecture and contracts
-- [Realtime Voice Execution Follow-Up](../docs/11_REALTIME_VOICE_EXECUTION_FOLLOW_UP.md) - Implementation status and rollout tracking
+- [Gemini Live Voice Driver](07_GEMINI_LIVE.md) - Realtime Gemini websocket voice integration
+- [OpenAI Realtime Voice Driver](08_OPENAI_REALTIME.md) - Realtime OpenAI websocket voice integration
+- [Realtime Voice Overview](../docs/10_REALTIME_VOICE.md) - Voice architecture and callback contract

@@ -67,8 +67,23 @@ Providers are adapters that connect to LLM services. Riffer supports:
 - **OpenAI** - GPT models via the OpenAI API
 - **Amazon Bedrock** - Claude and other models via AWS Bedrock
 - **Mock** - Mock provider for testing
+- **Anthropic** - Claude models via the Anthropic API
+- **Test** - Mock provider for testing
 
-See [Providers](providers/01_PROVIDERS.md) for details.
+See [Providers](../docs_providers/01_PROVIDERS.md) for details.
+
+### Realtime Voice
+
+Riffer also includes a provider-neutral realtime voice subsystem (`Riffer::Voice`) with typed events and websocket drivers.
+
+```ruby
+driver = Riffer::Voice::Drivers::Repository.find(:gemini_live).new
+# or: Riffer::Voice::Drivers::Repository.find(:openai_realtime).new
+```
+
+Voice drivers are separate from `Riffer::Agent` text generation and use callback-based event handling.
+
+See [Realtime Voice](10_REALTIME_VOICE.md) for details.
 
 ### Messages
 
@@ -129,3 +144,4 @@ Response
 - [Agents](03_AGENTS.md) - Agent configuration and usage
 - [Tools](04_TOOLS.md) - Creating tools
 - [Configuration](07_CONFIGURATION.md) - Global configuration
+- [Realtime Voice](10_REALTIME_VOICE.md) - Realtime voice drivers and events

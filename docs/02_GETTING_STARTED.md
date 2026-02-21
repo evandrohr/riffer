@@ -56,6 +56,20 @@ Riffer.configure do |config|
 end
 ```
 
+### Anthropic
+
+```ruby
+gem 'anthropic'
+```
+
+Configure your API key:
+
+```ruby
+Riffer.configure do |config|
+  config.anthropic.api_key = ENV['ANTHROPIC_API_KEY']
+end
+```
+
 ## Creating Your First Agent
 
 Define an agent by subclassing `Riffer::Agent`:
@@ -119,10 +133,56 @@ puts agent.generate("What time is it?")
 # => "The current time is 2024-01-15 14:30:00."
 ```
 
+## Realtime Voice (Optional)
+
+Realtime voice drivers run over websockets in an Async task context.
+
+Add Async dependencies to your Gemfile:
+
+```ruby
+gem 'async'
+gem 'async-http'
+gem 'async-websocket'
+```
+
+Configure credentials:
+
+```ruby
+Riffer.configure do |config|
+  config.gemini.api_key = ENV['GEMINI_API_KEY']
+  config.openai.api_key = ENV['OPENAI_API_KEY']
+end
+```
+
+Minimal voice session example:
+
+```ruby
+require 'async'
+
+Async do
+  driver = Riffer::Voice::Drivers::GeminiLive.new
+  begin
+    driver.connect(
+      system_prompt: "You are a concise voice assistant.",
+      callbacks: {
+        on_output_transcript: ->(event) { puts "[assistant] #{event.text}" },
+        on_error: ->(event) { warn "[voice error] #{event.code}: #{event.message}" }
+      }
+    )
+
+    driver.send_text_turn(text: "Say hello to the caller.")
+    # driver.send_audio_chunk(payload: base64_pcm_chunk, mime_type: "audio/pcm;rate=16000")
+  ensure
+    driver&.close(reason: "session_complete")
+  end
+end
+```
+
 ## Next Steps
 
 - [Agents](03_AGENTS.md) - Agent configuration options
 - [Tools](04_TOOLS.md) - Creating tools with parameters
 - [Messages](05_MESSAGES.md) - Message types and history
 - [Stream Events](06_STREAM_EVENTS.md) - Streaming event types
-- [Providers](providers/01_PROVIDERS.md) - Provider-specific guides
+- [Realtime Voice](10_REALTIME_VOICE.md) - Voice drivers and events
+- [Providers](../docs_providers/01_PROVIDERS.md) - Provider-specific guides
