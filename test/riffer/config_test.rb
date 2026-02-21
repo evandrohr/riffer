@@ -23,6 +23,19 @@ describe Riffer::Config do
     end
   end
 
+  describe "gemini namespace" do
+    it "initializes with nil gemini api_key" do
+      config = Riffer::Config.new
+      expect(config.gemini.api_key).must_be_nil
+    end
+
+    it "allows setting the api_key" do
+      config = Riffer::Config.new
+      config.gemini.api_key = "gemini-key"
+      expect(config.gemini.api_key).must_equal "gemini-key"
+    end
+  end
+
   describe "evals namespace" do
     it "initializes with nil judge_model" do
       config = Riffer::Config.new

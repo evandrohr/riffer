@@ -1,0 +1,42 @@
+# frozen_string_literal: true
+# rbs_inline: enabled
+
+# Emitted when provider usage/token information is available.
+class Riffer::Voice::Events::Usage < Riffer::Voice::Events::Base
+  # Input text tokens.
+  attr_reader :input_tokens #: Integer?
+
+  # Output text tokens.
+  attr_reader :output_tokens #: Integer?
+
+  # Input audio tokens.
+  attr_reader :input_audio_tokens #: Integer?
+
+  # Output audio tokens.
+  attr_reader :output_audio_tokens #: Integer?
+
+  # Additional provider metadata.
+  attr_reader :metadata #: Hash[Symbol, untyped]
+
+  #: (?input_tokens: Integer?, ?output_tokens: Integer?, ?input_audio_tokens: Integer?, ?output_audio_tokens: Integer?, ?metadata: Hash[Symbol, untyped], ?role: Symbol) -> void
+  def initialize(input_tokens: nil, output_tokens: nil, input_audio_tokens: nil, output_audio_tokens: nil, metadata: {}, role: :assistant)
+    super(role: role)
+    @input_tokens = input_tokens
+    @output_tokens = output_tokens
+    @input_audio_tokens = input_audio_tokens
+    @output_audio_tokens = output_audio_tokens
+    @metadata = metadata
+  end
+
+  #: () -> Hash[Symbol, untyped]
+  def to_h
+    {
+      role: @role,
+      input_tokens: @input_tokens,
+      output_tokens: @output_tokens,
+      input_audio_tokens: @input_audio_tokens,
+      output_audio_tokens: @output_audio_tokens,
+      metadata: @metadata
+    }.compact
+  end
+end

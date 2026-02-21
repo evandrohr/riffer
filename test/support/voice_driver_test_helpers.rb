@@ -1,0 +1,71 @@
+# frozen_string_literal: true
+
+module VoiceDriverTestHelpers
+  class FakeTransport
+    attr_reader :writes
+
+    def initialize(frames: [])
+      @frames = frames.dup
+      @writes = []
+      @closed = false
+    end
+
+    def read
+      @frames.shift
+    end
+
+    def write_json(payload)
+      @writes << payload
+    end
+
+    def close
+      @closed = true
+    end
+
+    def closed?
+      @closed
+    end
+  end
+
+  class FakeChildTask
+    attr_reader :annotation
+
+    def initialize(annotation:, &block)
+      @annotation = annotation
+      @block = block
+      @stopped = false
+    end
+
+    def run
+      @block.call unless @stopped
+    end
+
+    def stop
+      @stopped = true
+    end
+  end
+
+  class FakeAsyncTask
+    attr_reader :children
+
+    def initialize
+      @children = []
+    end
+
+    def async(annotation: nil, &block)
+      child = FakeChildTask.new(annotation: annotation, &block)
+      @children << child
+      child
+    end
+  end
+
+  class StubParser
+    def initialize(events: [])
+      @events = events
+    end
+
+    def call(_payload)
+      @events
+    end
+  end
+end
