@@ -11,6 +11,18 @@ Providers are adapters that connect Riffer to LLM services. They implement a com
 | Anthropic      | `anthropic`      | `anthropic`              |
 | Mock           | `mock`           | None                     |
 
+
+## Realtime Voice Drivers
+
+Riffer also includes realtime voice drivers under `Riffer::Voice::Drivers`.
+
+| Voice Driver | Identifier | Notes |
+| ------------ | ---------- | ----- |
+| Gemini Live | `gemini_live` | Native audio bidirectional websocket driver |
+| OpenAI Realtime GA | `openai_realtime` | Realtime GA websocket driver |
+
+Voice drivers are separate from text providers (`Riffer::Providers`) and use an event-based callback contract.
+
 ## Model String Format
 
 Agents specify providers using the `provider/model` format:
@@ -166,3 +178,5 @@ Riffer::Providers::Repository.find(:mock)
 - [OpenAI](04_OPENAI.md) - GPT models
 - [Mock](05_MOCK_PROVIDER.md) - Mock provider for testing
 - [Custom Providers](06_CUSTOM_PROVIDERS.md) - Creating your own provider
+- [Realtime Voice Plan](../docs/10_REALTIME_VOICE_PLAN.md) - Voice architecture and contracts
+- [Realtime Voice Execution Follow-Up](../docs/11_REALTIME_VOICE_EXECUTION_FOLLOW_UP.md) - Implementation status and rollout tracking

@@ -12,6 +12,7 @@ Riffer.configure do |config|
   config.amazon_bedrock.region = 'us-east-1'
   config.amazon_bedrock.api_token = ENV['BEDROCK_API_TOKEN']
   config.anthropic.api_key = ENV['ANTHROPIC_API_KEY']
+  config.gemini.api_key = ENV['GEMINI_API_KEY']
 end
 ```
 
@@ -28,6 +29,9 @@ Riffer.config.amazon_bedrock.region
 
 Riffer.config.anthropic.api_key
 # => "sk-ant-..."
+
+Riffer.config.gemini.api_key
+# => "AIza..."
 ```
 
 ## Provider-Specific Configuration
@@ -71,6 +75,20 @@ Riffer.configure do |config|
   config.anthropic.api_key = ENV['ANTHROPIC_API_KEY']
 end
 ```
+
+### Gemini
+
+| Option    | Description         |
+| --------- | ------------------- |
+| `api_key` | Your Gemini API key |
+
+```ruby
+Riffer.configure do |config|
+  config.gemini.api_key = ENV['GEMINI_API_KEY']
+end
+```
+
+This key is used by `Riffer::Voice::Drivers::GeminiLive` for realtime voice sessions.
 
 ## Agent-Level Configuration
 
