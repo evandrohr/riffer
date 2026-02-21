@@ -89,6 +89,7 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
         ]
       }
     )
+    @transport.write_json("type" => "response.create")
   rescue => error
     emit_error(code: "openai_realtime_send_text_failed", message: error.message, retriable: true, metadata: {error_class: error.class.name})
   end

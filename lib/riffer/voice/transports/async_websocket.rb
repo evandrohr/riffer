@@ -42,6 +42,8 @@ class Riffer::Voice::Transports::AsyncWebsocket
     end
 
     new(client: client, connection: connection)
+  rescue Riffer::Helpers::Dependencies::LoadError
+    raise
   rescue => error
     raise Riffer::Error, "Failed to establish websocket connection: #{error.message}"
   end

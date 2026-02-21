@@ -64,11 +64,12 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
     driver.send_text_turn(text: "hello", role: "user")
     driver.send_tool_response(call_id: "call_1", result: {ok: true})
 
-    expect(transport.writes.size).must_equal 5
+    expect(transport.writes.size).must_equal 6
     expect(transport.writes[1]["type"]).must_equal "input_audio_buffer.append"
     expect(transport.writes[2].dig("item", "content", 0, "text")).must_equal "hello"
-    expect(transport.writes[3].dig("item", "call_id")).must_equal "call_1"
-    expect(transport.writes[4]["type"]).must_equal "response.create"
+    expect(transport.writes[3]["type"]).must_equal "response.create"
+    expect(transport.writes[4].dig("item", "call_id")).must_equal "call_1"
+    expect(transport.writes[5]["type"]).must_equal "response.create"
   end
 
   it "raises when no async task context is available" do
