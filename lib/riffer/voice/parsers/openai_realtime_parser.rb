@@ -6,6 +6,7 @@ require "json"
 # Parses OpenAI Realtime GA payloads into normalized voice events.
 class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Base
   DEFAULT_AUDIO_MIME_TYPE = "audio/pcm;rate=24000" #: String
+  NON_ERROR_RESPONSE_STATUSES = ["cancelled", "canceled"].freeze #: Array[String]
 
   INTERRUPT_TYPES = [
     "input_audio_buffer.speech_started",
@@ -125,16 +126,16 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
     item_type = item["type"].to_s
     case item_type
     when "function_call"
-      parse_tool_call(item.merge("item_id" => fetch_any(item, ["id", "item_id", "itemId"])))
+      []
     when "message"
-      parse_output_item_message(item)
+      parse_output_item_message(item, is_final: data["type"] == "response.output_item.done")
     else
       []
     end
   end
 
-  #: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
-  def parse_output_item_message(item)
+  #: (Hash[String, untyped], is_final: bool) -> Array[Riffer::Voice::Events::Base]
+  def parse_output_item_message(item, is_final:)
     content = item["content"]
     return [] unless content.is_a?(Array)
 
@@ -154,7 +155,7 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
       if transcript && !transcript.to_s.empty? && ["audio", "output_audio", "text", "output_text"].include?(part_type)
         events << Riffer::Voice::Events::OutputTranscript.new(
           text: transcript.to_s,
-          is_final: true,
+          is_final: is_final,
           metadata: symbolize_hash(part)
         )
       end
@@ -169,7 +170,7 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
     status_details = response["status_details"].is_a?(Hash) ? response["status_details"] : {}
 
     events = [] #: Array[Riffer::Voice::Events::Base]
-    if !status.empty? && status != "completed"
+    if response_status_error?(status)
       events << Riffer::Voice::Events::Error.new(
         code: response_done_error_code(status: status, status_details: status_details),
         message: response_done_error_message(status: status, status_details: status_details),
@@ -190,6 +191,15 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
 
     events << Riffer::Voice::Events::TurnComplete.new(metadata: symbolize_hash(response))
     events
+  end
+
+  #: (String) -> bool
+  def response_status_error?(status)
+    normalized_status = status.to_s.downcase
+    return false if normalized_status.empty? || normalized_status == "completed"
+    return false if NON_ERROR_RESPONSE_STATUSES.include?(normalized_status)
+
+    true
   end
 
   #: (status: String, status_details: Hash[String, untyped]) -> String

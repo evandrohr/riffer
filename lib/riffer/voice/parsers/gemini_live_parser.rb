@@ -26,19 +26,17 @@ class Riffer::Voice::Parsers::GeminiLiveParser < Riffer::Voice::Parsers::Base
     model_turn = fetch_any(server_content, ["modelTurn", "model_turn"]) || {}
     parts = Array(model_turn["parts"])
 
-    inline_data = parts.filter_map do |part|
+    parts.filter_map do |part|
       next unless part.is_a?(Hash)
-      fetch_any(part, ["inlineData", "inline_data"])
-    end.first
+      inline_data = fetch_any(part, ["inlineData", "inline_data"])
+      next unless inline_data.is_a?(Hash)
 
-    return [] unless inline_data.is_a?(Hash)
+      payload = inline_data["data"]
+      next if payload.nil? || payload.to_s.empty?
 
-    payload = inline_data["data"]
-    return [] if payload.nil? || payload.to_s.empty?
-
-    mime_type = fetch_any(inline_data, ["mimeType", "mime_type"]) || "audio/pcm"
-
-    [Riffer::Voice::Events::AudioChunk.new(payload: payload.to_s, mime_type: mime_type.to_s)]
+      mime_type = fetch_any(inline_data, ["mimeType", "mime_type"]) || "audio/pcm"
+      Riffer::Voice::Events::AudioChunk.new(payload: payload.to_s, mime_type: mime_type.to_s)
+    end
   end
 
   #: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]

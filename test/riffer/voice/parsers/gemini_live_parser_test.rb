@@ -15,6 +15,12 @@ describe Riffer::Voice::Parsers::GeminiLiveParser do
                 "data" => "BASE64_AUDIO",
                 "mimeType" => "audio/pcm;rate=24000"
               }
+            },
+            {
+              "inlineData" => {
+                "data" => "BASE64_AUDIO_2",
+                "mimeType" => "audio/pcm;rate=24000"
+              }
             }
           ]
         },
@@ -50,6 +56,7 @@ describe Riffer::Voice::Parsers::GeminiLiveParser do
 
     expect(events.map(&:class)).must_equal [
       Riffer::Voice::Events::AudioChunk,
+      Riffer::Voice::Events::AudioChunk,
       Riffer::Voice::Events::InputTranscript,
       Riffer::Voice::Events::OutputTranscript,
       Riffer::Voice::Events::ToolCall,
@@ -57,6 +64,8 @@ describe Riffer::Voice::Parsers::GeminiLiveParser do
       Riffer::Voice::Events::TurnComplete,
       Riffer::Voice::Events::Usage
     ]
+    expect(events[0].payload).must_equal "BASE64_AUDIO"
+    expect(events[1].payload).must_equal "BASE64_AUDIO_2"
   end
 
   it "returns empty array for unsupported payload" do

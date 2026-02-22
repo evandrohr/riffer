@@ -56,7 +56,7 @@ describe Riffer::Voice::Parsers::OpenAIRealtimeParser do
     expect(event.arguments).must_equal({"id" => 1})
   end
 
-  it "parses function call from response.output_item.done" do
+  it "ignores function_call output items to avoid duplicate tool call events" do
     events = parser.call(
       {
         "type" => "response.output_item.done",
@@ -70,12 +70,7 @@ describe Riffer::Voice::Parsers::OpenAIRealtimeParser do
       }
     )
 
-    event = events.first
-    expect(event).must_be_instance_of Riffer::Voice::Events::ToolCall
-    expect(event.item_id).must_equal "item_1"
-    expect(event.call_id).must_equal "call_1"
-    expect(event.name).must_equal "lookup"
-    expect(event.arguments).must_equal({"id" => 1})
+    expect(events).must_equal []
   end
 
   it "parses audio content from response.output_item.done message content" do
@@ -101,6 +96,28 @@ describe Riffer::Voice::Parsers::OpenAIRealtimeParser do
     ])
     expect(events.first.payload).must_equal "BASE64_AUDIO"
     expect(events.last.text).must_equal "Hello there"
+    expect(events.last.is_final).must_equal true
+  end
+
+  it "marks output_item.added message transcripts as non-final" do
+    events = parser.call(
+      {
+        "type" => "response.output_item.added",
+        "item" => {
+          "type" => "message",
+          "content" => [
+            {
+              "type" => "text",
+              "text" => "Working..."
+            }
+          ]
+        }
+      }
+    )
+
+    expect(events.map(&:class)).must_equal([Riffer::Voice::Events::OutputTranscript])
+    expect(events.first.text).must_equal "Working..."
+    expect(events.first.is_final).must_equal false
   end
 
   it "parses audio chunk from response.content_part.added" do
@@ -162,6 +179,23 @@ describe Riffer::Voice::Parsers::OpenAIRealtimeParser do
     expect(events.first.code).must_equal "server_error"
     expect(events.first.message).must_equal "Model failed to generate output."
     expect(events.first.retriable).must_equal true
+  end
+
+  it "does not emit error when response.done status is cancelled" do
+    events = parser.call(
+      {
+        "type" => "response.done",
+        "response" => {
+          "id" => "resp_1",
+          "status" => "cancelled",
+          "status_details" => {
+            "type" => "client_cancelled"
+          }
+        }
+      }
+    )
+
+    expect(events.map(&:class)).must_equal([Riffer::Voice::Events::TurnComplete])
   end
 
   it "parses error event" do
