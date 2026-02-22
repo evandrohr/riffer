@@ -2,6 +2,7 @@
 # rbs_inline: enabled
 
 require "cgi"
+require "base64"
 require "json"
 
 # OpenAI Realtime GA voice driver.
@@ -10,9 +11,15 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
 
   DEFAULT_MODEL = "gpt-realtime" #: String
 
-  DEFAULT_INPUT_AUDIO_FORMAT = "pcm16" #: String
+  DEFAULT_AUDIO_FORMAT_TYPE = "audio/pcm" #: String
 
-  DEFAULT_OUTPUT_AUDIO_FORMAT = "pcm16" #: String
+  DEFAULT_AUDIO_MIME_TYPE = "audio/pcm" #: String
+
+  DEFAULT_AUDIO_SAMPLE_RATE = 24_000 #: Integer
+
+  DEFAULT_OUTPUT_VOICE = "alloy" #: String
+
+  DEFAULT_OUTPUT_MODALITIES = ["audio"] #: Array[String]
 
   #: (api_key: String?, ?model: String, ?endpoint: String, ?transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, ?parser: Riffer::Voice::Parsers::OpenAIRealtimeParser, ?task_resolver: ^() -> untyped, ?logger: untyped) -> void
   def initialize(api_key: nil, model: DEFAULT_MODEL, endpoint: DEFAULT_ENDPOINT, transport_factory: nil, parser: Riffer::Voice::Parsers::OpenAIRealtimeParser.new, task_resolver: nil, logger: nil)
@@ -60,13 +67,13 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
   end
 
   #: (payload: String, mime_type: String) -> void
-  def send_audio_chunk(payload:, mime_type: "audio/pcm")
+  def send_audio_chunk(payload:, mime_type: DEFAULT_AUDIO_MIME_TYPE)
     return if payload.nil? || payload.empty? || !connected?
+    normalized_audio_payload = normalize_input_audio_payload(payload: payload, mime_type: mime_type)
 
     @transport.write_json(
       "type" => "input_audio_buffer.append",
-      "audio" => payload,
-      "mime_type" => mime_type
+      "audio" => normalized_audio_payload
     )
   rescue => error
     emit_error(code: "openai_realtime_send_audio_failed", message: error.message, retriable: true, metadata: {error_class: error.class.name})
@@ -89,7 +96,7 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
         ]
       }
     )
-    @transport.write_json("type" => "response.create")
+    @transport.write_json(response_create_payload)
   rescue => error
     emit_error(code: "openai_realtime_send_text_failed", message: error.message, retriable: true, metadata: {error_class: error.class.name})
   end
@@ -109,7 +116,7 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
       }
     )
 
-    @transport.write_json("type" => "response.create")
+    @transport.write_json(response_create_payload)
   rescue => error
     emit_error(code: "openai_realtime_send_tool_response_failed", message: error.message, retriable: true, metadata: {error_class: error.class.name})
   end
@@ -151,9 +158,30 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
   #: (system_prompt: String, tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], config: Hash[Symbol | String, untyped]) -> Hash[String, untyped]
   def build_session_update_payload(system_prompt:, tools:, config:)
     session = {
+      "type" => "realtime",
+      "model" => model,
       "instructions" => system_prompt,
-      "input_audio_format" => DEFAULT_INPUT_AUDIO_FORMAT,
-      "output_audio_format" => DEFAULT_OUTPUT_AUDIO_FORMAT
+      "output_modalities" => DEFAULT_OUTPUT_MODALITIES,
+      "audio" => {
+        "input" => {
+          "format" => {
+            "type" => DEFAULT_AUDIO_FORMAT_TYPE,
+            "rate" => DEFAULT_AUDIO_SAMPLE_RATE
+          },
+          "turn_detection" => {
+            "type" => "semantic_vad",
+            "create_response" => true,
+            "interrupt_response" => false
+          }
+        },
+        "output" => {
+          "voice" => DEFAULT_OUTPUT_VOICE,
+          "format" => {
+            "type" => DEFAULT_AUDIO_FORMAT_TYPE,
+            "rate" => DEFAULT_AUDIO_SAMPLE_RATE
+          }
+        }
+      }
     }
 
     normalized_tools = normalize_openai_tools(tools)
@@ -171,17 +199,65 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
   def normalize_openai_tools(tools)
     tools.filter_map do |tool|
       if tool.is_a?(Class) && tool <= Riffer::Tool
-        {
+        sanitize_openai_tool({
           "type" => "function",
           "name" => tool.name,
           "description" => tool.description,
-          "parameters" => tool.parameters_schema,
-          "strict" => true
-        }
+          "parameters" => tool.parameters_schema
+        })
       elsif tool.is_a?(Hash)
-        stringify_hash(tool)
+        sanitize_openai_tool(stringify_hash(tool))
       end
     end
+  end
+
+  #: (Hash[String, untyped]) -> Hash[String, untyped]
+  def sanitize_openai_tool(tool)
+    sanitized_tool = sanitize_openai_schema_node(tool)
+    sanitized_tool.reject { |key, _| key.to_s == "strict" }
+  end
+
+  #: (untyped) -> untyped
+  def sanitize_openai_schema_node(value)
+    case value
+    when Hash
+      value.each_with_object({}) do |(key, nested), normalized|
+        key_name = key.to_s
+        normalized[key_name] = if key_name == "pattern" && nested.is_a?(String)
+          normalize_openai_pattern(nested)
+        else
+          sanitize_openai_schema_node(nested)
+        end
+      end
+    when Array
+      value.map { |item| sanitize_openai_schema_node(item) }
+    else
+      value
+    end
+  end
+
+  #: (String) -> String
+  def normalize_openai_pattern(pattern)
+    pattern.gsub("\\A", "^").gsub("\\z", "$").gsub("\\Z", "$")
+  end
+
+  #: () -> Hash[String, untyped]
+  def response_create_payload
+    {
+      "type" => "response.create",
+      "response" => {
+        "output_modalities" => DEFAULT_OUTPUT_MODALITIES,
+        "audio" => {
+          "output" => {
+            "voice" => DEFAULT_OUTPUT_VOICE,
+            "format" => {
+              "type" => DEFAULT_AUDIO_FORMAT_TYPE,
+              "rate" => DEFAULT_AUDIO_SAMPLE_RATE
+            }
+          }
+        }
+      }
+    }
   end
 
   #: () -> void
@@ -193,7 +269,10 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
       payload = parse_frame_payload(frame)
       next unless payload
 
-      @parser.call(payload).each { |event| emit_event(event) }
+      parsed_events = @parser.call(payload)
+      log_response_payload(payload: payload, parsed_events: parsed_events)
+      log_unparsed_response_payload(payload) if parsed_events.empty?
+      parsed_events.each { |event| emit_event(event) }
     end
   rescue => error
     emit_error(code: "openai_realtime_reader_failed", message: error.message, retriable: true, metadata: {error_class: error.class.name})
@@ -237,5 +316,83 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
     mark_disconnected!
   rescue
     nil
+  end
+
+  #: (Hash[String, untyped]) -> void
+  def log_unparsed_response_payload(payload)
+    type = payload["type"].to_s
+    return unless type.start_with?("response.")
+    return unless @logger&.respond_to?(:info)
+
+    response = payload["response"].is_a?(Hash) ? payload["response"] : {}
+    @logger.info(
+      type: self.class.name,
+      event: "openai_realtime_unparsed_payload",
+      payload_type: type,
+      payload_keys: payload.keys,
+      response_status: response["status"],
+      response_status_details: response["status_details"]
+    )
+  rescue
+    nil
+  end
+
+  #: (payload: Hash[String, untyped], parsed_events: Array[Riffer::Voice::Events::Base]) -> void
+  def log_response_payload(payload:, parsed_events:)
+    type = payload["type"].to_s
+    return unless type.start_with?("response.")
+    return unless @logger&.respond_to?(:info)
+
+    @logger.info(
+      type: self.class.name,
+      event: "openai_realtime_response_payload",
+      payload_type: type,
+      parsed_events_count: parsed_events.length,
+      parsed_event_types: parsed_events.map { |event| event.class.name }
+    )
+  rescue
+    nil
+  end
+
+  #: (payload: String, mime_type: String) -> String
+  def normalize_input_audio_payload(payload:, mime_type:)
+    mime = mime_type.to_s
+    return payload unless mime.include?("audio/pcm")
+
+    source_rate = extract_sample_rate(mime)
+    return payload if source_rate.nil? || source_rate == DEFAULT_AUDIO_SAMPLE_RATE
+
+    raw = Base64.strict_decode64(payload)
+    resampled = resample_pcm16(raw, from_rate: source_rate, to_rate: DEFAULT_AUDIO_SAMPLE_RATE)
+    Base64.strict_encode64(resampled)
+  rescue
+    payload
+  end
+
+  #: (String) -> Integer?
+  def extract_sample_rate(mime_type)
+    match = mime_type.match(/rate=(?<rate>\d+)/i)
+    return nil unless match
+
+    rate = match[:rate].to_i
+    return nil unless rate.positive?
+
+    rate
+  end
+
+  #: (String, from_rate: Integer, to_rate: Integer) -> String
+  def resample_pcm16(raw_audio, from_rate:, to_rate:)
+    source_samples = raw_audio.unpack("s<*")
+    return "".b if source_samples.empty?
+    return raw_audio if from_rate == to_rate
+
+    sample_count = [(source_samples.length * to_rate.to_f / from_rate).round, 1].max
+    source_max_index = source_samples.length - 1
+    resampled = Array.new(sample_count) do |index|
+      source_index = (index * from_rate.to_f / to_rate).floor
+      source_samples[[source_index, source_max_index].min]
+    end
+
+    resampled.pack("s<*")
   end
 end

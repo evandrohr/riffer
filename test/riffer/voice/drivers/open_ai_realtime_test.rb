@@ -2,6 +2,7 @@
 
 require "test_helper"
 require "support/voice_driver_test_helpers"
+require "base64"
 
 describe Riffer::Voice::Drivers::OpenAIRealtime do
   let(:async_task) { VoiceDriverTestHelpers::FakeAsyncTask.new }
@@ -28,6 +29,55 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
     expect(connection_args[:url]).must_include "model=gpt-realtime"
     expect(connection_args[:headers]["Authorization"]).must_equal "Bearer openai-key"
     expect(transport.writes.first["type"]).must_equal "session.update"
+    expect(transport.writes.first.dig("session", "type")).must_equal "realtime"
+    expect(transport.writes.first.dig("session", "model")).must_equal "gpt-realtime"
+    expect(transport.writes.first.dig("session", "output_modalities")).must_equal ["audio"]
+    expect(transport.writes.first.dig("session", "input_audio_format")).must_be_nil
+    expect(transport.writes.first.dig("session", "output_audio_format")).must_be_nil
+    expect(transport.writes.first.dig("session", "audio", "input", "format", "type")).must_equal "audio/pcm"
+    expect(transport.writes.first.dig("session", "audio", "input", "format", "rate")).must_equal 24_000
+    expect(transport.writes.first.dig("session", "audio", "input", "turn_detection", "type")).must_equal "semantic_vad"
+    expect(transport.writes.first.dig("session", "audio", "input", "turn_detection", "create_response")).must_equal true
+    expect(transport.writes.first.dig("session", "audio", "input", "turn_detection", "interrupt_response")).must_equal false
+    expect(transport.writes.first.dig("session", "audio", "output", "format", "type")).must_equal "audio/pcm"
+    expect(transport.writes.first.dig("session", "audio", "output", "format", "rate")).must_equal 24_000
+    expect(transport.writes.first.dig("session", "audio", "output", "voice")).must_equal "alloy"
+  end
+
+  it "strips unsupported strict flag from session tools" do
+    transport = VoiceDriverTestHelpers::FakeTransport.new
+
+    driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
+      api_key: "openai-key",
+      model: "gpt-realtime",
+      transport_factory: ->(url:, headers:) { transport },
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    tool = {
+      "type" => "function",
+      "name" => "lookup_clinic",
+      "description" => "Lookup clinic info",
+      "parameters" => {
+        "type" => "object",
+        "properties" => {
+          "id" => {
+            "type" => "string",
+            "pattern" => "\\A\\+\\d{1,15}\\z"
+          }
+        },
+        "required" => ["id"]
+      },
+      "strict" => true
+    }
+
+    driver.connect(system_prompt: "You are helpful", tools: [tool])
+
+    written_tool = transport.writes.first.dig("session", "tools", 0)
+    expect(written_tool["name"]).must_equal "lookup_clinic"
+    expect(written_tool.key?("strict")).must_equal false
+    expect(written_tool.dig("parameters", "properties", "id", "pattern")).must_equal "^\\+\\d{1,15}$"
   end
 
   it "emits parser events from the reader loop" do
@@ -66,10 +116,39 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
 
     expect(transport.writes.size).must_equal 6
     expect(transport.writes[1]["type"]).must_equal "input_audio_buffer.append"
+    expect(transport.writes[1].key?("mime_type")).must_equal false
     expect(transport.writes[2].dig("item", "content", 0, "text")).must_equal "hello"
     expect(transport.writes[3]["type"]).must_equal "response.create"
+    expect(transport.writes[3].dig("response", "output_modalities")).must_equal ["audio"]
+    expect(transport.writes[3].dig("response", "audio", "output", "voice")).must_equal "alloy"
+    expect(transport.writes[3].dig("response", "audio", "output", "format", "type")).must_equal "audio/pcm"
+    expect(transport.writes[3].dig("response", "audio", "output", "format", "rate")).must_equal 24_000
     expect(transport.writes[4].dig("item", "call_id")).must_equal "call_1"
     expect(transport.writes[5]["type"]).must_equal "response.create"
+    expect(transport.writes[5].dig("response", "output_modalities")).must_equal ["audio"]
+    expect(transport.writes[5].dig("response", "audio", "output", "voice")).must_equal "alloy"
+  end
+
+  it "upsamples 16k PCM audio chunks to 24k for OpenAI realtime input" do
+    transport = VoiceDriverTestHelpers::FakeTransport.new
+
+    driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
+      api_key: "openai-key",
+      model: "gpt-realtime",
+      transport_factory: ->(url:, headers:) { transport },
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    driver.connect(system_prompt: "You are helpful")
+
+    source_pcm = [100, -100, 200, -200].pack("s<*")
+    source_payload = Base64.strict_encode64(source_pcm)
+    driver.send_audio_chunk(payload: source_payload, mime_type: "audio/pcm;rate=16000")
+
+    sent_payload = transport.writes[1]["audio"]
+    sent_pcm = Base64.strict_decode64(sent_payload)
+    expect(sent_pcm.unpack("s<*").length).must_be :>, source_pcm.unpack("s<*").length
   end
 
   it "raises when no async task context is available" do
