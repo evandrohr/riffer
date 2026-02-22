@@ -1,0 +1,6 @@
+inherit_gem:
+  standard: config/base.yml
+
+AllCops:
+  CacheRootDirectory: tmp/rubocop_cache
+  SuggestExtensions: false
