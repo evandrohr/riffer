@@ -167,7 +167,7 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
     driver.send_text_turn(text: "hello", role: "user")
     driver.send_tool_response(call_id: "call_1", result: {ok: true})
 
-    expect(transport.writes.size).must_equal 6
+    expect(transport.writes.size).must_equal 5
     expect(transport.writes[1]["type"]).must_equal "input_audio_buffer.append"
     expect(transport.writes[1].key?("mime_type")).must_equal false
     expect(transport.writes[2].dig("item", "content", 0, "text")).must_equal "hello"
@@ -177,9 +177,39 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
     expect(transport.writes[3].dig("response", "audio", "output", "format", "type")).must_equal "audio/pcm"
     expect(transport.writes[3].dig("response", "audio", "output", "format", "rate")).must_equal 24_000
     expect(transport.writes[4].dig("item", "call_id")).must_equal "call_1"
-    expect(transport.writes[5]["type"]).must_equal "response.create"
-    expect(transport.writes[5].dig("response", "output_modalities")).must_equal ["audio"]
-    expect(transport.writes[5].dig("response", "audio", "output", "voice")).must_equal "alloy"
+  end
+
+  it "defers response.create until response is completed when one is already active" do
+    transport = VoiceDriverTestHelpers::FakeTransport.new(
+      frames: [
+        {"type" => "response.done", "response" => {"status" => "completed"}}.to_json
+      ]
+    )
+
+    driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
+      api_key: "openai-key",
+      model: "gpt-realtime",
+      transport_factory: ->(url:, headers:) { transport },
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    driver.connect(system_prompt: "You are helpful")
+    driver.send_text_turn(text: "hello", role: "user")
+    driver.send_tool_response(call_id: "call_1", result: {ok: true})
+
+    expect(transport.writes.map { |payload| payload["type"] }).must_equal(
+      [
+        "session.update",
+        "conversation.item.create",
+        "response.create",
+        "conversation.item.create"
+      ]
+    )
+
+    async_task.children.first.run
+
+    expect(transport.writes.last["type"]).must_equal "response.create"
   end
 
   it "upsamples 16k PCM audio chunks to 24k for OpenAI realtime input" do

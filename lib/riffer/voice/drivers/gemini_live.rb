@@ -255,10 +255,12 @@ class Riffer::Voice::Drivers::GeminiLive < Riffer::Voice::Drivers::Base
 
   #: (call_id: String, result: untyped) -> Hash[String, untyped]
   def normalize_tool_response_payload(call_id:, result:)
-    return {
-      "id" => call_id,
-      "response" => {"result" => result}
-    } unless result.is_a?(Hash)
+    unless result.is_a?(Hash)
+      return {
+        "id" => call_id,
+        "response" => {"result" => result}
+      }
+    end
 
     payload = deep_stringify(result)
     tool_payload = {

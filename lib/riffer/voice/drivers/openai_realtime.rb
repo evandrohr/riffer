@@ -53,6 +53,8 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
     }
     @transport = nil
     @reader_task = nil
+    @response_in_progress = false
+    @response_create_pending = false
   end
 
   #: (system_prompt: String, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], ?config: Hash[Symbol | String, untyped], ?callbacks: Hash[Symbol, ^(Riffer::Voice::Events::Base) -> void]) -> bool
@@ -112,7 +114,7 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
         ]
       }
     )
-    @transport.write_json(response_create_payload)
+    request_response_create
   rescue => error
     emit_error(code: "openai_realtime_send_text_failed", message: error.message, retriable: true, metadata: {error_class: error.class.name})
   end
@@ -132,7 +134,7 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
       }
     )
 
-    @transport.write_json(response_create_payload)
+    request_response_create
   rescue => error
     emit_error(code: "openai_realtime_send_tool_response_failed", message: error.message, retriable: true, metadata: {error_class: error.class.name})
   end
@@ -146,6 +148,8 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
     @transport&.close
     @transport = nil
     @reader_task = nil
+    @response_in_progress = false
+    @response_create_pending = false
     log_debug(reason: reason)
   rescue => error
     emit_error(code: "openai_realtime_close_failed", message: error.message, retriable: false, metadata: {error_class: error.class.name})
@@ -314,6 +318,7 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
       payload = parse_frame_payload(frame)
       next unless payload
 
+      update_response_tracking(payload)
       parsed_events = @parser.call(payload)
       log_response_payload(payload: payload, parsed_events: parsed_events)
       log_unparsed_response_payload(payload) if parsed_events.empty?
@@ -358,9 +363,68 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
     @transport&.close
     @transport = nil
     @reader_task = nil
+    @response_in_progress = false
+    @response_create_pending = false
     mark_disconnected!
   rescue
     nil
+  end
+
+  #: () -> void
+  def request_response_create
+    if @response_in_progress
+      @response_create_pending = true
+      return
+    end
+
+    @transport.write_json(response_create_payload)
+    @response_in_progress = true
+    @response_create_pending = false
+  end
+
+  #: (Hash[String, untyped]) -> void
+  def update_response_tracking(payload)
+    type = payload["type"].to_s
+
+    case type
+    when "response.created", "response.in_progress"
+      @response_in_progress = true
+    when "response.done", "response.completed", "response.cancelled", "response.canceled", "response.failed"
+      @response_in_progress = false
+      flush_pending_response_create
+    when "error"
+      update_response_tracking_from_error(payload)
+    end
+  rescue
+    nil
+  end
+
+  #: (Hash[String, untyped]) -> void
+  def update_response_tracking_from_error(payload)
+    error_payload = payload["error"].is_a?(Hash) ? payload["error"] : {}
+    code = (error_payload["code"] || error_payload["type"] || "").to_s
+    return unless code == "conversation_already_has_active_response"
+
+    @response_in_progress = true
+    @response_create_pending = true
+  end
+
+  #: () -> void
+  def flush_pending_response_create
+    return unless @response_create_pending
+    return unless connected?
+    return if @response_in_progress
+
+    @transport.write_json(response_create_payload)
+    @response_in_progress = true
+    @response_create_pending = false
+  rescue => error
+    emit_error(
+      code: "openai_realtime_send_response_create_failed",
+      message: error.message,
+      retriable: true,
+      metadata: {error_class: error.class.name}
+    )
   end
 
   #: (Hash[String, untyped]) -> void
