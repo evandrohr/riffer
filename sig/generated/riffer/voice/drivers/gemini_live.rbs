@@ -62,6 +62,9 @@ class Riffer::Voice::Drivers::GeminiLive < Riffer::Voice::Drivers::Base
   # : (untyped) -> untyped
   def deep_stringify: (untyped) -> untyped
 
+  # : (call_id: String, result: untyped) -> Hash[String, untyped]
+  def normalize_tool_response_payload: (call_id: String, result: untyped) -> Hash[String, untyped]
+
   # : (Hash[String, untyped], Hash[String, untyped]) -> Hash[String, untyped]
   def deep_merge: (Hash[String, untyped], Hash[String, untyped]) -> Hash[String, untyped]
 

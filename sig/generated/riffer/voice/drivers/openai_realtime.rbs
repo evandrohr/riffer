@@ -86,6 +86,18 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
   # : () -> void
   def cleanup_connection: () -> void
 
+  # : () -> void
+  def request_response_create: () -> void
+
+  # : (Hash[String, untyped]) -> void
+  def update_response_tracking: (Hash[String, untyped]) -> void
+
+  # : (Hash[String, untyped]) -> void
+  def update_response_tracking_from_error: (Hash[String, untyped]) -> void
+
+  # : () -> void
+  def flush_pending_response_create: () -> void
+
   # : (Hash[String, untyped]) -> void
   def log_unparsed_response_payload: (Hash[String, untyped]) -> void
 
