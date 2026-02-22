@@ -12,6 +12,8 @@ class Riffer::Voice::Parsers::Base
 
   #: (Hash[Symbol | String, untyped]) -> Hash[String, untyped]
   def normalize_hash(payload)
+    return payload if payload.each_key.all? { |k| k.is_a?(String) }
+
     deep_stringify(payload)
   end
 

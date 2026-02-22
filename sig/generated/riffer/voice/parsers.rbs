@@ -1,0 +1,5 @@
+# Generated from lib/riffer/voice/parsers.rb with RBS::Inline
+
+# Namespace for provider-specific realtime payload parsers.
+module Riffer::Voice::Parsers
+end

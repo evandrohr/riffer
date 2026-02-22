@@ -1,0 +1,19 @@
+# Generated from lib/riffer/voice/events/output_transcript.rb with RBS::Inline
+
+# Emitted when the provider reports output (assistant) transcription.
+class Riffer::Voice::Events::OutputTranscript < Riffer::Voice::Events::Base
+  # Transcribed text.
+  attr_reader text: String
+
+  # Whether this transcript is final.
+  attr_reader is_final: bool?
+
+  # Additional provider metadata.
+  attr_reader metadata: Hash[Symbol, untyped]
+
+  # : (text: String, ?is_final: bool?, ?metadata: Hash[Symbol, untyped], ?role: Symbol) -> void
+  def initialize: (text: String, ?is_final: bool?, ?metadata: Hash[Symbol, untyped], ?role: Symbol) -> void
+
+  # : () -> Hash[Symbol, untyped]
+  def to_h: () -> Hash[Symbol, untyped]
+end

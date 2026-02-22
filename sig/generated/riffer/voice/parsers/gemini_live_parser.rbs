@@ -1,0 +1,81 @@
+# Generated from lib/riffer/voice/parsers/gemini_live_parser.rb with RBS::Inline
+
+# Parses Gemini Live realtime payloads into normalized voice events.
+class Riffer::Voice::Parsers::GeminiLiveParser < Riffer::Voice::Parsers::Base
+  KEYS_SERVER_CONTENT: Array[String]
+
+  KEYS_MODEL_TURN: Array[String]
+
+  KEYS_INLINE_DATA: Array[String]
+
+  KEYS_MIME_TYPE: Array[String]
+
+  KEYS_INPUT_TRANSCRIPTION: Array[String]
+
+  KEYS_OUTPUT_TRANSCRIPTION: Array[String]
+
+  KEYS_TEXT_TRANSCRIPT: Array[String]
+
+  KEYS_IS_FINAL: Array[String]
+
+  KEYS_TOOL_CALL: Array[String]
+
+  KEYS_FUNCTION_CALLS: Array[String]
+
+  KEYS_FUNCTION_CALL: Array[String]
+
+  KEYS_CALL_ID: Array[String]
+
+  KEYS_NAME: Array[String]
+
+  KEYS_ARGS: Array[String]
+
+  KEYS_ITEM_ID: Array[String]
+
+  KEYS_TURN_COMPLETE: Array[String]
+
+  KEYS_USAGE: Array[String]
+
+  KEYS_INPUT_TOKENS: Array[String]
+
+  KEYS_OUTPUT_TOKENS: Array[String]
+
+  KEYS_INPUT_AUDIO_TOKENS: Array[String]
+
+  KEYS_OUTPUT_AUDIO_TOKENS: Array[String]
+
+  # : (Hash[Symbol | String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def call: (Hash[Symbol | String, untyped]) -> Array[Riffer::Voice::Events::Base]
+
+  private
+
+  # : (Hash[String, untyped], Hash[String, untyped]?) -> bool
+  def audio_only_frame?: (Hash[String, untyped], Hash[String, untyped]?) -> bool
+
+  # : (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def extract_audio_chunk: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+
+  # : (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def extract_input_transcript: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+
+  # : (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def extract_output_transcript: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+
+  # : (untyped, klass: singleton(Riffer::Voice::Events::Base)) -> Array[Riffer::Voice::Events::Base]
+  def transcript_event: (untyped, klass: singleton(Riffer::Voice::Events::Base)) -> Array[Riffer::Voice::Events::Base]
+
+  # : (Hash[String, untyped], Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def extract_tool_calls: (Hash[String, untyped], Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+
+  # : (Hash[String, untyped], Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def extract_interrupt: (Hash[String, untyped], Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+
+  # : (Hash[String, untyped], Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def extract_turn_complete: (Hash[String, untyped], Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+
+  # : (Hash[String, untyped], Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def extract_usage: (Hash[String, untyped], Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+
+  # : (untyped) -> Integer?
+  def int_or_nil: (untyped) -> Integer?
+end

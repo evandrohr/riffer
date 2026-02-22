@@ -1,0 +1,24 @@
+# Generated from lib/riffer/voice/parsers/base.rb with RBS::Inline
+
+# Base class for provider-specific realtime event parsers.
+class Riffer::Voice::Parsers::Base
+  # : (Hash[Symbol | String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def call: (Hash[Symbol | String, untyped]) -> Array[Riffer::Voice::Events::Base]
+
+  private
+
+  # : (Hash[Symbol | String, untyped]) -> Hash[String, untyped]
+  def normalize_hash: (Hash[Symbol | String, untyped]) -> Hash[String, untyped]
+
+  # : (untyped) -> untyped
+  def deep_stringify: (untyped) -> untyped
+
+  # : (Hash[String, untyped], Array[String]) -> untyped
+  def fetch_any: (Hash[String, untyped], Array[String]) -> untyped
+
+  # : (Hash[String, untyped], Array[String]) -> bool
+  def true_any?: (Hash[String, untyped], Array[String]) -> bool
+
+  # : (Hash[String, untyped]) -> Hash[Symbol, untyped]
+  def symbolize_hash: (Hash[String, untyped]) -> Hash[Symbol, untyped]
+end

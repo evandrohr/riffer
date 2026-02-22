@@ -1,0 +1,30 @@
+# Generated from lib/riffer/voice/transports/async_websocket.rb with RBS::Inline
+
+# Async websocket transport for realtime voice drivers.
+class Riffer::Voice::Transports::AsyncWebsocket
+  HTTP1_ALPN: Array[String]
+
+  # Managed websocket connection handles.
+  attr_reader client: untyped
+
+  # Managed websocket stream.
+  attr_reader connection: untyped
+
+  # : (client: untyped, connection: untyped) -> void
+  def initialize: (client: untyped, connection: untyped) -> void
+
+  # : (url: String, ?headers: Hash[String, String]) -> Riffer::Voice::Transports::AsyncWebsocket
+  def self.connect: (url: String, ?headers: Hash[String, String]) -> Riffer::Voice::Transports::AsyncWebsocket
+
+  # : (client: untyped, endpoint: untyped, headers: Hash[String, String]) -> untyped
+  def self.connect_with_headers: (client: untyped, endpoint: untyped, headers: Hash[String, String]) -> untyped
+
+  # : () -> untyped
+  def read: () -> untyped
+
+  # : (Hash[String, untyped]) -> void
+  def write_json: (Hash[String, untyped]) -> void
+
+  # : () -> void
+  def close: () -> void
+end

@@ -3,12 +3,40 @@
 
 # Parses Gemini Live realtime payloads into normalized voice events.
 class Riffer::Voice::Parsers::GeminiLiveParser < Riffer::Voice::Parsers::Base
+  KEYS_SERVER_CONTENT = ["serverContent", "server_content"].freeze #: Array[String]
+  KEYS_MODEL_TURN = ["modelTurn", "model_turn"].freeze #: Array[String]
+  KEYS_INLINE_DATA = ["inlineData", "inline_data"].freeze #: Array[String]
+  KEYS_MIME_TYPE = ["mimeType", "mime_type"].freeze #: Array[String]
+  KEYS_INPUT_TRANSCRIPTION = ["inputTranscription", "input_transcription"].freeze #: Array[String]
+  KEYS_OUTPUT_TRANSCRIPTION = ["outputTranscription", "output_transcription"].freeze #: Array[String]
+  KEYS_TEXT_TRANSCRIPT = ["text", "transcript"].freeze #: Array[String]
+  KEYS_IS_FINAL = ["isFinal", "final", "finished"].freeze #: Array[String]
+  KEYS_TOOL_CALL = ["toolCall", "tool_call"].freeze #: Array[String]
+  KEYS_FUNCTION_CALLS = ["functionCalls", "function_calls"].freeze #: Array[String]
+  KEYS_FUNCTION_CALL = ["functionCall", "function_call"].freeze #: Array[String]
+  KEYS_CALL_ID = ["id", "callId", "call_id"].freeze #: Array[String]
+  KEYS_NAME = ["name", "functionName", "function_name"].freeze #: Array[String]
+  KEYS_ARGS = ["args", "arguments"].freeze #: Array[String]
+  KEYS_ITEM_ID = ["itemId", "item_id", "id"].freeze #: Array[String]
+  KEYS_TURN_COMPLETE = ["turnComplete", "turn_complete"].freeze #: Array[String]
+  KEYS_USAGE = ["usageMetadata", "usage_metadata", "usage"].freeze #: Array[String]
+  KEYS_INPUT_TOKENS = ["promptTokenCount", "inputTokens", "input_tokens"].freeze #: Array[String]
+  KEYS_OUTPUT_TOKENS = ["candidatesTokenCount", "outputTokens", "output_tokens"].freeze #: Array[String]
+  KEYS_INPUT_AUDIO_TOKENS = ["inputAudioTokenCount", "inputAudioTokens", "input_audio_tokens"].freeze #: Array[String]
+  KEYS_OUTPUT_AUDIO_TOKENS = ["outputAudioTokenCount", "outputAudioTokens", "output_audio_tokens"].freeze #: Array[String]
+
   #: (Hash[Symbol | String, untyped]) -> Array[Riffer::Voice::Events::Base]
   def call(payload)
     data = normalize_hash(payload)
-    events = [] #: Array[Riffer::Voice::Events::Base]
+    server_content = fetch_any(data, KEYS_SERVER_CONTENT)
 
-    server_content = fetch_any(data, ["serverContent", "server_content"]) || {}
+    # Fast path: pure audio delta frames (most frequent during voice streaming).
+    if audio_only_frame?(data, server_content)
+      return extract_audio_chunk(server_content)
+    end
+
+    events = [] #: Array[Riffer::Voice::Events::Base]
+    server_content ||= {}
     events.concat(extract_audio_chunk(server_content))
     events.concat(extract_input_transcript(server_content))
     events.concat(extract_output_transcript(server_content))
@@ -21,33 +49,47 @@ class Riffer::Voice::Parsers::GeminiLiveParser < Riffer::Voice::Parsers::Base
 
   private
 
+  #: (Hash[String, untyped], Hash[String, untyped]?) -> bool
+  def audio_only_frame?(data, server_content)
+    return false unless server_content.is_a?(Hash)
+    return false unless server_content.key?("modelTurn") || server_content.key?("model_turn")
+    return false if server_content.key?("inputTranscription") || server_content.key?("input_transcription")
+    return false if server_content.key?("outputTranscription") || server_content.key?("output_transcription")
+    return false if server_content.key?("interrupted")
+    return false if server_content.key?("turnComplete") || server_content.key?("turn_complete")
+    return false if data.key?("toolCall") || data.key?("tool_call")
+    return false if data.key?("usageMetadata") || data.key?("usage_metadata") || data.key?("usage")
+
+    true
+  end
+
   #: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
   def extract_audio_chunk(server_content)
-    model_turn = fetch_any(server_content, ["modelTurn", "model_turn"]) || {}
+    model_turn = fetch_any(server_content, KEYS_MODEL_TURN) || {}
     parts = Array(model_turn["parts"])
 
     parts.filter_map do |part|
       next unless part.is_a?(Hash)
-      inline_data = fetch_any(part, ["inlineData", "inline_data"])
+      inline_data = fetch_any(part, KEYS_INLINE_DATA)
       next unless inline_data.is_a?(Hash)
 
       payload = inline_data["data"]
       next if payload.nil? || payload.to_s.empty?
 
-      mime_type = fetch_any(inline_data, ["mimeType", "mime_type"]) || "audio/pcm"
+      mime_type = fetch_any(inline_data, KEYS_MIME_TYPE) || "audio/pcm"
       Riffer::Voice::Events::AudioChunk.new(payload: payload.to_s, mime_type: mime_type.to_s)
     end
   end
 
   #: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
   def extract_input_transcript(server_content)
-    transcription = fetch_any(server_content, ["inputTranscription", "input_transcription"])
+    transcription = fetch_any(server_content, KEYS_INPUT_TRANSCRIPTION)
     transcript_event(transcription, klass: Riffer::Voice::Events::InputTranscript)
   end
 
   #: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
   def extract_output_transcript(server_content)
-    transcription = fetch_any(server_content, ["outputTranscription", "output_transcription"])
+    transcription = fetch_any(server_content, KEYS_OUTPUT_TRANSCRIPTION)
     transcript_event(transcription, klass: Riffer::Voice::Events::OutputTranscript)
   end
 
@@ -61,34 +103,34 @@ class Riffer::Voice::Parsers::GeminiLiveParser < Riffer::Voice::Parsers::Base
 
     return [] unless transcription.is_a?(Hash)
 
-    text = fetch_any(transcription, ["text", "transcript"])
+    text = fetch_any(transcription, KEYS_TEXT_TRANSCRIPT)
     return [] if text.nil? || text.to_s.empty?
 
-    is_final = fetch_any(transcription, ["isFinal", "final", "finished"])
+    is_final = fetch_any(transcription, KEYS_IS_FINAL)
     metadata = symbolize_hash(transcription)
     [klass.new(text: text.to_s, is_final: is_final.nil? ? nil : is_final == true, metadata: metadata)]
   end
 
   #: (Hash[String, untyped], Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
   def extract_tool_calls(data, server_content)
-    payload = fetch_any(data, ["toolCall", "tool_call"]) || fetch_any(server_content, ["toolCall", "tool_call"])
+    payload = fetch_any(data, KEYS_TOOL_CALL) || fetch_any(server_content, KEYS_TOOL_CALL)
     return [] unless payload.is_a?(Hash)
 
-    function_calls = Array(fetch_any(payload, ["functionCalls", "function_calls"]))
+    function_calls = Array(fetch_any(payload, KEYS_FUNCTION_CALLS))
     function_calls = [payload] if function_calls.empty?
 
     function_calls.filter_map do |entry|
       next unless entry.is_a?(Hash)
 
-      call = fetch_any(entry, ["functionCall", "function_call"]) || entry
+      call = fetch_any(entry, KEYS_FUNCTION_CALL) || entry
       next unless call.is_a?(Hash)
 
-      call_id = fetch_any(call, ["id", "callId", "call_id"])
-      name = fetch_any(call, ["name", "functionName", "function_name"])
-      arguments = fetch_any(call, ["args", "arguments"]) || {}
+      call_id = fetch_any(call, KEYS_CALL_ID)
+      name = fetch_any(call, KEYS_NAME)
+      arguments = fetch_any(call, KEYS_ARGS) || {}
       next if call_id.nil? || name.nil?
 
-      item_id = fetch_any(call, ["itemId", "item_id", "id"])
+      item_id = fetch_any(call, KEYS_ITEM_ID)
       Riffer::Voice::Events::ToolCall.new(
         call_id: call_id.to_s,
         name: name.to_s,
@@ -100,16 +142,15 @@ class Riffer::Voice::Parsers::GeminiLiveParser < Riffer::Voice::Parsers::Base
 
   #: (Hash[String, untyped], Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
   def extract_interrupt(data, server_content)
-    interrupted = true_any?(data, ["interrupted"]) || true_any?(server_content, ["interrupted"])
-    return [] unless interrupted
+    return [] unless data["interrupted"] == true || server_content["interrupted"] == true
 
     [Riffer::Voice::Events::Interrupt.new(reason: "interrupted")]
   end
 
   #: (Hash[String, untyped], Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
   def extract_turn_complete(data, server_content)
-    turn_complete = true_any?(data, ["turnComplete", "turn_complete"]) ||
-      true_any?(server_content, ["turnComplete", "turn_complete"])
+    turn_complete = true_any?(data, KEYS_TURN_COMPLETE) ||
+      true_any?(server_content, KEYS_TURN_COMPLETE)
     return [] unless turn_complete
 
     [Riffer::Voice::Events::TurnComplete.new(metadata: {})]
@@ -117,14 +158,14 @@ class Riffer::Voice::Parsers::GeminiLiveParser < Riffer::Voice::Parsers::Base
 
   #: (Hash[String, untyped], Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
   def extract_usage(data, server_content)
-    usage = fetch_any(data, ["usageMetadata", "usage_metadata", "usage"]) ||
-      fetch_any(server_content, ["usageMetadata", "usage_metadata", "usage"])
+    usage = fetch_any(data, KEYS_USAGE) ||
+      fetch_any(server_content, KEYS_USAGE)
     return [] unless usage.is_a?(Hash)
 
-    input_tokens = fetch_any(usage, ["promptTokenCount", "inputTokens", "input_tokens"])
-    output_tokens = fetch_any(usage, ["candidatesTokenCount", "outputTokens", "output_tokens"])
-    input_audio_tokens = fetch_any(usage, ["inputAudioTokenCount", "inputAudioTokens", "input_audio_tokens"])
-    output_audio_tokens = fetch_any(usage, ["outputAudioTokenCount", "outputAudioTokens", "output_audio_tokens"])
+    input_tokens = fetch_any(usage, KEYS_INPUT_TOKENS)
+    output_tokens = fetch_any(usage, KEYS_OUTPUT_TOKENS)
+    input_audio_tokens = fetch_any(usage, KEYS_INPUT_AUDIO_TOKENS)
+    output_audio_tokens = fetch_any(usage, KEYS_OUTPUT_AUDIO_TOKENS)
 
     return [] if [input_tokens, output_tokens, input_audio_tokens, output_audio_tokens].all?(&:nil?)
 

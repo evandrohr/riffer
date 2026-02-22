@@ -1,0 +1,5 @@
+# Generated from lib/riffer/voice/events.rb with RBS::Inline
+
+# Namespace for realtime voice typed events.
+module Riffer::Voice::Events
+end

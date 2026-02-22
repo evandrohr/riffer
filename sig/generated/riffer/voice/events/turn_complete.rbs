@@ -1,0 +1,13 @@
+# Generated from lib/riffer/voice/events/turn_complete.rb with RBS::Inline
+
+# Emitted when a provider completes a response turn.
+class Riffer::Voice::Events::TurnComplete < Riffer::Voice::Events::Base
+  # Additional provider metadata.
+  attr_reader metadata: Hash[Symbol, untyped]
+
+  # : (?metadata: Hash[Symbol, untyped], ?role: Symbol) -> void
+  def initialize: (?metadata: Hash[Symbol, untyped], ?role: Symbol) -> void
+
+  # : () -> Hash[Symbol, untyped]
+  def to_h: () -> Hash[Symbol, untyped]
+end

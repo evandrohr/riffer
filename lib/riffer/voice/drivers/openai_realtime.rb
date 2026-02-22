@@ -19,7 +19,23 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
 
   DEFAULT_OUTPUT_VOICE = "alloy" #: String
 
-  DEFAULT_OUTPUT_MODALITIES = ["audio"] #: Array[String]
+  DEFAULT_OUTPUT_MODALITIES = ["audio"].freeze #: Array[String]
+
+  RESPONSE_CREATE_PAYLOAD = {
+    "type" => "response.create",
+    "response" => {
+      "output_modalities" => DEFAULT_OUTPUT_MODALITIES,
+      "audio" => {
+        "output" => {
+          "voice" => DEFAULT_OUTPUT_VOICE,
+          "format" => {
+            "type" => DEFAULT_AUDIO_FORMAT_TYPE,
+            "rate" => DEFAULT_AUDIO_SAMPLE_RATE
+          }.freeze
+        }.freeze
+      }.freeze
+    }.freeze
+  }.freeze #: Hash[String, untyped]
 
   #: (api_key: String?, ?model: String, ?endpoint: String, ?transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, ?parser: Riffer::Voice::Parsers::OpenAIRealtimeParser, ?task_resolver: ^() -> untyped, ?logger: untyped) -> void
   def initialize(api_key: nil, model: DEFAULT_MODEL, endpoint: DEFAULT_ENDPOINT, transport_factory: nil, parser: Riffer::Voice::Parsers::OpenAIRealtimeParser.new, task_resolver: nil, logger: nil)
@@ -286,21 +302,7 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
 
   #: () -> Hash[String, untyped]
   def response_create_payload
-    {
-      "type" => "response.create",
-      "response" => {
-        "output_modalities" => DEFAULT_OUTPUT_MODALITIES,
-        "audio" => {
-          "output" => {
-            "voice" => DEFAULT_OUTPUT_VOICE,
-            "format" => {
-              "type" => DEFAULT_AUDIO_FORMAT_TYPE,
-              "rate" => DEFAULT_AUDIO_SAMPLE_RATE
-            }
-          }
-        }
-      }
-    }
+    RESPONSE_CREATE_PAYLOAD
   end
 
   #: () -> void
@@ -414,13 +416,16 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
 
   #: (String) -> Integer?
   def extract_sample_rate(mime_type)
+    @sample_rate_cache ||= {} #: Hash[String, Integer?]
+    return @sample_rate_cache[mime_type] if @sample_rate_cache.key?(mime_type)
+
     match = mime_type.match(/rate=(?<rate>\d+)/i)
-    return nil unless match
+    rate = if match
+      value = match[:rate].to_i
+      value.positive? ? value : nil
+    end
 
-    rate = match[:rate].to_i
-    return nil unless rate.positive?
-
-    rate
+    @sample_rate_cache[mime_type] = rate
   end
 
   #: (String, from_rate: Integer, to_rate: Integer) -> String

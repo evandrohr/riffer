@@ -1,0 +1,5 @@
+# Generated from lib/riffer/voice/drivers.rb with RBS::Inline
+
+# Namespace for realtime voice provider drivers.
+module Riffer::Voice::Drivers
+end

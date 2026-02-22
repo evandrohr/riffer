@@ -14,6 +14,26 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
     "response.cancelled"
   ].freeze #: Array[String]
 
+  KEYS_DELTA_PAYLOAD = ["delta", "audio", "data"].freeze #: Array[String]
+  KEYS_PART_AUDIO = ["audio", "delta", "data"].freeze #: Array[String]
+  KEYS_MIME_TYPE = ["mime_type", "mimeType"].freeze #: Array[String]
+  KEYS_DELTA_TEXT = ["delta", "transcript", "text"].freeze #: Array[String]
+  KEYS_TRANSCRIPT_TEXT = ["transcript", "text"].freeze #: Array[String]
+  KEYS_CALL_ID = ["call_id", "callId", "item_id", "itemId"].freeze #: Array[String]
+  KEYS_ITEM_ID = ["item_id", "itemId"].freeze #: Array[String]
+  KEYS_ENTITY_ID = ["id", "item_id", "itemId"].freeze #: Array[String]
+  KEYS_ERROR_CODE = ["code", "type"].freeze #: Array[String]
+  KEYS_INPUT_TOKENS = ["input_tokens", "inputTokens"].freeze #: Array[String]
+  KEYS_OUTPUT_TOKENS = ["output_tokens", "outputTokens"].freeze #: Array[String]
+  KEYS_INPUT_AUDIO_TOKENS = ["input_audio_tokens", "inputAudioTokens"].freeze #: Array[String]
+  KEYS_OUTPUT_AUDIO_TOKENS = ["output_audio_tokens", "outputAudioTokens"].freeze #: Array[String]
+  KEYS_STATUS_DETAILS_CODE = ["code", "type"].freeze #: Array[String]
+
+  AUDIO_PART_TYPES = ["audio", "output_audio"].freeze #: Array[String]
+  TRANSCRIPT_PART_TYPES = ["audio", "output_audio", "text", "output_text"].freeze #: Array[String]
+
+  RETRIABLE_ERROR_CODES = ["server_error", "rate_limit_exceeded", "overloaded_error"].freeze #: Array[String]
+
   #: (Hash[Symbol | String, untyped]) -> Array[Riffer::Voice::Events::Base]
   def call(payload)
     data = normalize_hash(payload)
@@ -56,16 +76,16 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
     part_type = part["type"].to_s
     events = [] #: Array[Riffer::Voice::Events::Base]
 
-    if ["audio", "output_audio"].include?(part_type)
-      audio_payload = fetch_any(part, ["audio", "delta", "data"])
+    if AUDIO_PART_TYPES.include?(part_type)
+      audio_payload = fetch_any(part, KEYS_PART_AUDIO)
       unless audio_payload.nil? || audio_payload.to_s.empty?
-        mime_type = fetch_any(part, ["mime_type", "mimeType"]) || DEFAULT_AUDIO_MIME_TYPE
+        mime_type = fetch_any(part, KEYS_MIME_TYPE) || DEFAULT_AUDIO_MIME_TYPE
         events << Riffer::Voice::Events::AudioChunk.new(payload: audio_payload.to_s, mime_type: mime_type.to_s)
       end
     end
 
-    text_payload = fetch_any(part, ["transcript", "text"])
-    if !text_payload.nil? && !text_payload.to_s.empty? && ["audio", "output_audio", "text", "output_text"].include?(part_type)
+    text_payload = fetch_any(part, KEYS_TRANSCRIPT_TEXT)
+    if !text_payload.nil? && !text_payload.to_s.empty? && TRANSCRIPT_PART_TYPES.include?(part_type)
       events << Riffer::Voice::Events::OutputTranscript.new(
         text: text_payload.to_s,
         is_final: is_final,
@@ -80,16 +100,16 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
 
   #: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
   def parse_audio_delta(data)
-    payload = fetch_any(data, ["delta", "audio", "data"])
+    payload = fetch_any(data, KEYS_DELTA_PAYLOAD)
     return [] if payload.nil? || payload.to_s.empty?
 
-    mime_type = fetch_any(data, ["mime_type", "mimeType"]) || DEFAULT_AUDIO_MIME_TYPE
+    mime_type = fetch_any(data, KEYS_MIME_TYPE) || DEFAULT_AUDIO_MIME_TYPE
     [Riffer::Voice::Events::AudioChunk.new(payload: payload.to_s, mime_type: mime_type.to_s)]
   end
 
   #: (Hash[String, untyped], is_final: bool) -> Array[Riffer::Voice::Events::Base]
   def parse_input_transcript(data, is_final:)
-    text = fetch_any(data, ["delta", "transcript", "text"])
+    text = fetch_any(data, KEYS_DELTA_TEXT)
     return [] if text.nil? || text.to_s.empty?
 
     [Riffer::Voice::Events::InputTranscript.new(text: text.to_s, is_final: is_final, metadata: symbolize_hash(data))]
@@ -97,7 +117,7 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
 
   #: (Hash[String, untyped], is_final: bool) -> Array[Riffer::Voice::Events::Base]
   def parse_output_transcript(data, is_final:)
-    text = fetch_any(data, ["delta", "transcript", "text"])
+    text = fetch_any(data, KEYS_DELTA_TEXT)
     return [] if text.nil? || text.to_s.empty?
 
     [Riffer::Voice::Events::OutputTranscript.new(text: text.to_s, is_final: is_final, metadata: symbolize_hash(data))]
@@ -105,14 +125,14 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
 
   #: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
   def parse_tool_call(data)
-    call_id = fetch_any(data, ["call_id", "callId", "item_id", "itemId"])
+    call_id = fetch_any(data, KEYS_CALL_ID)
     name = data["name"]
     arguments = parse_arguments(data["arguments"])
     return [] if call_id.nil? || name.nil?
 
     [Riffer::Voice::Events::ToolCall.new(
       call_id: call_id.to_s,
-      item_id: fetch_any(data, ["item_id", "itemId"])&.to_s,
+      item_id: fetch_any(data, KEYS_ITEM_ID)&.to_s,
       name: name.to_s,
       arguments: arguments
     )]
@@ -143,16 +163,16 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
       next unless part.is_a?(Hash)
 
       part_type = part["type"].to_s
-      if ["audio", "output_audio"].include?(part_type)
-        audio_payload = fetch_any(part, ["audio", "delta", "data"])
+      if AUDIO_PART_TYPES.include?(part_type)
+        audio_payload = fetch_any(part, KEYS_PART_AUDIO)
         if audio_payload && !audio_payload.to_s.empty?
-          mime_type = fetch_any(part, ["mime_type", "mimeType"]) || DEFAULT_AUDIO_MIME_TYPE
+          mime_type = fetch_any(part, KEYS_MIME_TYPE) || DEFAULT_AUDIO_MIME_TYPE
           events << Riffer::Voice::Events::AudioChunk.new(payload: audio_payload.to_s, mime_type: mime_type.to_s)
         end
       end
 
-      transcript = fetch_any(part, ["transcript", "text"])
-      if transcript && !transcript.to_s.empty? && ["audio", "output_audio", "text", "output_text"].include?(part_type)
+      transcript = fetch_any(part, KEYS_TRANSCRIPT_TEXT)
+      if transcript && !transcript.to_s.empty? && TRANSCRIPT_PART_TYPES.include?(part_type)
         events << Riffer::Voice::Events::OutputTranscript.new(
           text: transcript.to_s,
           is_final: is_final,
@@ -181,10 +201,10 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
 
     unless usage.empty?
       events << Riffer::Voice::Events::Usage.new(
-        input_tokens: int_or_nil(fetch_any(usage, ["input_tokens", "inputTokens"])),
-        output_tokens: int_or_nil(fetch_any(usage, ["output_tokens", "outputTokens"])),
-        input_audio_tokens: int_or_nil(fetch_any(usage, ["input_audio_tokens", "inputAudioTokens"])),
-        output_audio_tokens: int_or_nil(fetch_any(usage, ["output_audio_tokens", "outputAudioTokens"])),
+        input_tokens: int_or_nil(fetch_any(usage, KEYS_INPUT_TOKENS)),
+        output_tokens: int_or_nil(fetch_any(usage, KEYS_OUTPUT_TOKENS)),
+        input_audio_tokens: int_or_nil(fetch_any(usage, KEYS_INPUT_AUDIO_TOKENS)),
+        output_audio_tokens: int_or_nil(fetch_any(usage, KEYS_OUTPUT_AUDIO_TOKENS)),
         metadata: symbolize_hash(usage)
       )
     end
@@ -204,7 +224,7 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
 
   #: (status: String, status_details: Hash[String, untyped]) -> String
   def response_done_error_code(status:, status_details:)
-    explicit_code = fetch_any(status_details, ["code", "type"]) || status_details.dig("error", "code")
+    explicit_code = fetch_any(status_details, KEYS_STATUS_DETAILS_CODE) || status_details.dig("error", "code")
     return explicit_code.to_s unless explicit_code.nil? || explicit_code.to_s.empty?
 
     "response_#{status}"
@@ -221,7 +241,7 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
   #: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
   def parse_error(data)
     error = data["error"].is_a?(Hash) ? data["error"] : data
-    code = fetch_any(error, ["code", "type"]) || "provider_error"
+    code = fetch_any(error, KEYS_ERROR_CODE) || "provider_error"
     message = error["message"] || "Provider realtime error"
     retriable = retriable_error?(code.to_s)
 
@@ -252,7 +272,7 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
 
   #: (String) -> bool
   def retriable_error?(code)
-    ["server_error", "rate_limit_exceeded", "overloaded_error"].include?(code)
+    RETRIABLE_ERROR_CODES.include?(code)
   end
 
   #: (untyped) -> Integer?

@@ -1,0 +1,5 @@
+# Generated from lib/riffer/voice/transports.rb with RBS::Inline
+
+# Namespace for realtime transport adapters.
+module Riffer::Voice::Transports
+end

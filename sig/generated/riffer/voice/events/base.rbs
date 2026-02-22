@@ -1,0 +1,13 @@
+# Generated from lib/riffer/voice/events/base.rb with RBS::Inline
+
+# Base class for realtime voice events.
+class Riffer::Voice::Events::Base
+  # Event role context.
+  attr_reader role: Symbol
+
+  # : (?role: Symbol) -> void
+  def initialize: (?role: Symbol) -> void
+
+  # : () -> Hash[Symbol, untyped]
+  def to_h: () -> Hash[Symbol, untyped]
+end

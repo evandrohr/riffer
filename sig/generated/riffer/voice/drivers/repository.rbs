@@ -1,0 +1,9 @@
+# Generated from lib/riffer/voice/drivers/repository.rb with RBS::Inline
+
+# Registry for realtime voice drivers.
+class Riffer::Voice::Drivers::Repository
+  REPO: Hash[Symbol, ^() -> singleton(Riffer::Voice::Drivers::Base)]
+
+  # : ((String | Symbol)) -> singleton(Riffer::Voice::Drivers::Base)?
+  def self.find: (String | Symbol) -> singleton(Riffer::Voice::Drivers::Base)?
+end
