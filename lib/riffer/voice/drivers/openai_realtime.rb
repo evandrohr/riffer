@@ -187,12 +187,28 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
     normalized_tools = normalize_openai_tools(tools)
     session["tools"] = normalized_tools unless normalized_tools.empty?
 
-    session.merge!(stringify_hash(config)) unless config.empty?
+    session = merge_session_config(session: session, config: config)
 
     {
       "type" => "session.update",
       "session" => session
     }
+  end
+
+  #: (session: Hash[String, untyped], config: Hash[Symbol | String, untyped]) -> Hash[String, untyped]
+  def merge_session_config(session:, config:)
+    return session if config.empty?
+
+    overrides = deep_stringify(config)
+    if overrides.key?("turn_detection")
+      overrides = overrides.dup
+      turn_detection = overrides.delete("turn_detection")
+      overrides["audio"] ||= {}
+      overrides["audio"]["input"] ||= {}
+      overrides["audio"]["input"]["turn_detection"] ||= turn_detection
+    end
+
+    deep_merge(session, overrides)
   end
 
   #: (Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]) -> Array[Hash[String, untyped]]
@@ -239,6 +255,33 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
   #: (String) -> String
   def normalize_openai_pattern(pattern)
     pattern.gsub("\\A", "^").gsub("\\z", "$").gsub("\\Z", "$")
+  end
+
+  #: (Hash[String, untyped], Hash[String, untyped]) -> Hash[String, untyped]
+  def deep_merge(base, overrides)
+    merged = base.dup
+    overrides.each do |key, value|
+      merged[key] = if merged[key].is_a?(Hash) && value.is_a?(Hash)
+        deep_merge(merged[key], value)
+      else
+        value
+      end
+    end
+    merged
+  end
+
+  #: (untyped) -> untyped
+  def deep_stringify(value)
+    case value
+    when Hash
+      value.each_with_object({}) do |(key, nested), result|
+        result[key.to_s] = deep_stringify(nested)
+      end
+    when Array
+      value.map { |item| deep_stringify(item) }
+    else
+      value
+    end
   end
 
   #: () -> Hash[String, untyped]
@@ -322,10 +365,10 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
   def log_unparsed_response_payload(payload)
     type = payload["type"].to_s
     return unless type.start_with?("response.")
-    return unless @logger&.respond_to?(:info)
+    return unless @logger&.respond_to?(:debug)
 
     response = payload["response"].is_a?(Hash) ? payload["response"] : {}
-    @logger.info(
+    @logger.debug(
       type: self.class.name,
       event: "openai_realtime_unparsed_payload",
       payload_type: type,
@@ -341,9 +384,9 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
   def log_response_payload(payload:, parsed_events:)
     type = payload["type"].to_s
     return unless type.start_with?("response.")
-    return unless @logger&.respond_to?(:info)
+    return unless @logger&.respond_to?(:debug)
 
-    @logger.info(
+    @logger.debug(
       type: self.class.name,
       event: "openai_realtime_response_payload",
       payload_type: type,

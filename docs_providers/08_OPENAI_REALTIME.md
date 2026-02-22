@@ -30,8 +30,8 @@ You can also pass `api_key:` directly to the driver constructor.
 | ------- | ------- |
 | `model` | `gpt-realtime` |
 | `endpoint` | `wss://api.openai.com/v1/realtime` |
-| Session `input_audio_format` | `pcm16` |
-| Session `output_audio_format` | `pcm16` |
+| Session `audio.input.format` | `{type: "audio/pcm", rate: 24000}` |
+| Session `audio.output.format` | `{type: "audio/pcm", rate: 24000}` |
 | `send_audio_chunk` MIME type | `audio/pcm` |
 
 ## Connect
@@ -45,7 +45,11 @@ driver.connect(
   system_prompt: "You are a concise voice assistant.",
   tools: [MyTool],
   config: {
-    turn_detection: {type: "server_vad"},
+    audio: {
+      input: {
+        turn_detection: {type: "server_vad"}
+      }
+    },
     temperature: 0.3
   },
   callbacks: {

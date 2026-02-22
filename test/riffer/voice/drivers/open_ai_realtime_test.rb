@@ -80,6 +80,59 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
     expect(written_tool.dig("parameters", "properties", "id", "pattern")).must_equal "^\\+\\d{1,15}$"
   end
 
+  it "maps legacy top-level turn_detection config into audio.input.turn_detection" do
+    transport = VoiceDriverTestHelpers::FakeTransport.new
+
+    driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
+      api_key: "openai-key",
+      model: "gpt-realtime",
+      transport_factory: ->(url:, headers:) { transport },
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    driver.connect(
+      system_prompt: "You are helpful",
+      config: {
+        turn_detection: {
+          type: "server_vad",
+          create_response: false
+        }
+      }
+    )
+
+    expect(transport.writes.first.dig("session", "turn_detection")).must_be_nil
+    expect(transport.writes.first.dig("session", "audio", "input", "turn_detection", "type")).must_equal "server_vad"
+    expect(transport.writes.first.dig("session", "audio", "input", "turn_detection", "create_response")).must_equal false
+  end
+
+  it "deep merges nested audio config without dropping required defaults" do
+    transport = VoiceDriverTestHelpers::FakeTransport.new
+
+    driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
+      api_key: "openai-key",
+      model: "gpt-realtime",
+      transport_factory: ->(url:, headers:) { transport },
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    driver.connect(
+      system_prompt: "You are helpful",
+      config: {
+        audio: {
+          output: {
+            voice: "verse"
+          }
+        }
+      }
+    )
+
+    expect(transport.writes.first.dig("session", "audio", "output", "voice")).must_equal "verse"
+    expect(transport.writes.first.dig("session", "audio", "output", "format", "type")).must_equal "audio/pcm"
+    expect(transport.writes.first.dig("session", "audio", "output", "format", "rate")).must_equal 24_000
+  end
+
   it "emits parser events from the reader loop" do
     transport = VoiceDriverTestHelpers::FakeTransport.new(frames: [{"ok" => true}.to_json])
     events = []
