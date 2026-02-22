@@ -100,12 +100,7 @@ class Riffer::Voice::Drivers::GeminiLive < Riffer::Voice::Drivers::Base
   def send_tool_response(call_id:, result:)
     return if call_id.nil? || call_id.empty? || !connected?
 
-    response_payload = if result.is_a?(Hash)
-      stringify_hash(result)
-    else
-      {"response" => {"result" => result}}
-    end
-    response_payload["id"] ||= call_id
+    response_payload = normalize_tool_response_payload(call_id: call_id, result: result)
 
     @transport.write_json(
       "toolResponse" => {
@@ -256,6 +251,31 @@ class Riffer::Voice::Drivers::GeminiLive < Riffer::Voice::Drivers::Base
     else
       value
     end
+  end
+
+  #: (call_id: String, result: untyped) -> Hash[String, untyped]
+  def normalize_tool_response_payload(call_id:, result:)
+    return {
+      "id" => call_id,
+      "response" => {"result" => result}
+    } unless result.is_a?(Hash)
+
+    payload = deep_stringify(result)
+    tool_payload = {
+      "id" => payload["id"].to_s.empty? ? call_id : payload["id"].to_s
+    }
+
+    name = payload["name"]
+    tool_payload["name"] = name.to_s unless name.nil? || name.to_s.empty?
+
+    response_value = if payload.key?("response")
+      payload["response"]
+    else
+      payload.reject { |key, _value| key == "id" || key == "name" }
+    end
+
+    tool_payload["response"] = response_value.is_a?(Hash) ? response_value : {"result" => response_value}
+    tool_payload
   end
 
   #: (Hash[String, untyped], Hash[String, untyped]) -> Hash[String, untyped]

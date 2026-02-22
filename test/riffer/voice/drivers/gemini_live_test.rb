@@ -72,7 +72,7 @@ describe Riffer::Voice::Drivers::GeminiLive do
     driver.connect(system_prompt: "You are helpful")
     driver.send_audio_chunk(payload: "AUDIO", mime_type: "audio/pcm;rate=16000")
     driver.send_text_turn(text: "hello", role: "user")
-    driver.send_tool_response(call_id: "call_1", result: {response: {ok: true}})
+    driver.send_tool_response(call_id: "call_1", result: {"status" => "error", "message" => "no patient"})
 
     expect(transport.writes.size).must_equal 4
     expect(transport.writes[1]).must_equal(
@@ -84,7 +84,36 @@ describe Riffer::Voice::Drivers::GeminiLive do
       }
     )
     expect(transport.writes[2].dig("clientContent", "turns", 0, "parts", 0, "text")).must_equal "hello"
-    expect(transport.writes[3].dig("toolResponse", "functionResponses", 0, "id")).must_equal "call_1"
+    function_response = transport.writes[3].dig("toolResponse", "functionResponses", 0)
+    expect(function_response["id"]).must_equal "call_1"
+    expect(function_response["response"]).must_equal(
+      "status" => "error",
+      "message" => "no patient"
+    )
+    expect(function_response.key?("status")).must_equal false
+  end
+
+  it "preserves explicit name and nested response for tool response payloads" do
+    driver = Riffer::Voice::Drivers::GeminiLive.new(
+      api_key: "test-key",
+      model: "gemini-2.5-flash-native-audio-preview-12-2025",
+      transport_factory: transport_factory,
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    driver.connect(system_prompt: "You are helpful")
+    driver.send_tool_response(
+      call_id: "call_2",
+      result: {"name" => "find_patient", "response" => {"status" => "success"}}
+    )
+
+    function_response = transport.writes.last.dig("toolResponse", "functionResponses", 0)
+    expect(function_response).must_equal(
+      "id" => "call_2",
+      "name" => "find_patient",
+      "response" => {"status" => "success"}
+    )
   end
 
   it "merges provided config over defaults" do
