@@ -212,6 +212,37 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
     expect(transport.writes.last["type"]).must_equal "response.create"
   end
 
+  it "clears response.create tracking when provider returns non-active-response error" do
+    transport = VoiceDriverTestHelpers::FakeTransport.new
+
+    driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
+      api_key: "openai-key",
+      model: "gpt-realtime",
+      transport_factory: ->(url:, headers:) { transport },
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    driver.connect(system_prompt: "You are helpful")
+    driver.send_text_turn(text: "hello", role: "user")
+    driver.send(
+      :update_response_tracking,
+      {"type" => "error", "error" => {"code" => "rate_limit_exceeded", "message" => "rate limited"}}
+    )
+
+    driver.send_tool_response(call_id: "call_1", result: {ok: true})
+
+    expect(transport.writes.map { |payload| payload["type"] }).must_equal(
+      [
+        "session.update",
+        "conversation.item.create",
+        "response.create",
+        "conversation.item.create",
+        "response.create"
+      ]
+    )
+  end
+
   it "upsamples 16k PCM audio chunks to 24k for OpenAI realtime input" do
     transport = VoiceDriverTestHelpers::FakeTransport.new
 

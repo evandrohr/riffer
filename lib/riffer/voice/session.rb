@@ -43,7 +43,11 @@ class Riffer::Voice::Session
 
   #: () -> bool
   def connected?
-    @connected == true
+    return false unless @connected == true
+
+    @adapter.connected? == true
+  rescue
+    false
   end
 
   #: () -> bool
@@ -120,7 +124,7 @@ class Riffer::Voice::Session
 
   #: () -> void
   def connect_adapter!
-    required_methods = [:connect, :send_text_turn, :send_audio_chunk, :send_tool_response, :close]
+    required_methods = [:connect, :connected?, :send_text_turn, :send_audio_chunk, :send_tool_response, :close]
     missing_methods = required_methods.reject { |method_name| @adapter.respond_to?(method_name) }
     unless missing_methods.empty?
       raise Riffer::ArgumentError, "adapter must respond to: #{required_methods.join(", ")}"

@@ -81,6 +81,7 @@ module TestSupport
         @audio_chunks = []
         @tool_responses = []
         @on_event = nil
+        @connected = false
         @closed = false
       end
 
@@ -91,7 +92,12 @@ module TestSupport
           config: config
         }
         @on_event = on_event
+        @connected = @connect_result == true
         @connect_result
+      end
+
+      def connected?
+        @connected == true
       end
 
       def send_text_turn(text:)
@@ -117,7 +123,12 @@ module TestSupport
       end
 
       def close
+        @connected = false
         @closed = true
+      end
+
+      def disconnect!
+        @connected = false
       end
 
       def closed?

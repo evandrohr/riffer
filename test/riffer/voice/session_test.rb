@@ -145,6 +145,16 @@ describe Riffer::Voice::Session do
       expect(events).must_be_instance_of Enumerator
     end
 
+    it "raises when adapter disconnects after session is established" do
+      session
+      adapter.disconnect!
+
+      expect(session.connected?).must_equal false
+      expect { session.send_text_turn(text: "hello") }.must_raise Riffer::Error
+      expect { session.send_audio_chunk(payload: "BASE64", mime_type: "audio/pcm") }.must_raise Riffer::Error
+      expect { session.send_tool_response(call_id: "call_1", result: {ok: true}) }.must_raise Riffer::Error
+    end
+
     it "raises on invalid send input" do
       expect { session.send_text_turn(text: "") }.must_raise Riffer::ArgumentError
       expect { session.send_audio_chunk(payload: "", mime_type: "audio/pcm") }.must_raise Riffer::ArgumentError

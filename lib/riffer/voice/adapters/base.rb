@@ -18,6 +18,11 @@ class Riffer::Voice::Adapters::Base
     raise NotImplementedError, "Subclasses must implement #connect"
   end
 
+  #: () -> bool
+  def connected?
+    raise NotImplementedError, "Subclasses must implement #connected?"
+  end
+
   #: (text: String) -> void
   def send_text_turn(text:)
     raise NotImplementedError, "Subclasses must implement #send_text_turn"

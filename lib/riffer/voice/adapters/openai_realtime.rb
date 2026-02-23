@@ -25,6 +25,11 @@ class Riffer::Voice::Adapters::OpenAIRealtime < Riffer::Voice::Adapters::Base
     )
   end
 
+  #: () -> bool
+  def connected?
+    @driver.connected?
+  end
+
   #: (text: String) -> void
   def send_text_turn(text:)
     @driver.send_text_turn(text: text)

@@ -55,6 +55,7 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
     @reader_task = nil
     @response_in_progress = false
     @response_create_pending = false
+    @response_create_in_flight = false
   end
 
   #: (system_prompt: String, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], ?config: Hash[Symbol | String, untyped], ?callbacks: Hash[Symbol, ^(Riffer::Voice::Events::Base) -> void]) -> bool
@@ -150,6 +151,7 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
     @reader_task = nil
     @response_in_progress = false
     @response_create_pending = false
+    @response_create_in_flight = false
     log_debug(reason: reason)
   rescue => error
     emit_error(code: "openai_realtime_close_failed", message: error.message, retriable: false, metadata: {error_class: error.class.name})
@@ -365,6 +367,7 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
     @reader_task = nil
     @response_in_progress = false
     @response_create_pending = false
+    @response_create_in_flight = false
     mark_disconnected!
   rescue
     nil
@@ -378,6 +381,7 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
     end
 
     @transport.write_json(response_create_payload)
+    @response_create_in_flight = true
     @response_in_progress = true
     @response_create_pending = false
   end
@@ -388,8 +392,10 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
 
     case type
     when "response.created", "response.in_progress"
+      @response_create_in_flight = false
       @response_in_progress = true
     when "response.done", "response.completed", "response.cancelled", "response.canceled", "response.failed"
+      @response_create_in_flight = false
       @response_in_progress = false
       flush_pending_response_create
     when "error"
@@ -403,10 +409,18 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
   def update_response_tracking_from_error(payload)
     error_payload = payload["error"].is_a?(Hash) ? payload["error"] : {}
     code = (error_payload["code"] || error_payload["type"] || "").to_s
-    return unless code == "conversation_already_has_active_response"
+    if code == "conversation_already_has_active_response"
+      @response_create_in_flight = false
+      @response_in_progress = true
+      @response_create_pending = true
+      return
+    end
 
-    @response_in_progress = true
-    @response_create_pending = true
+    return unless @response_create_in_flight
+
+    @response_create_in_flight = false
+    @response_in_progress = false
+    flush_pending_response_create
   end
 
   #: () -> void
