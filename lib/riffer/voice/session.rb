@@ -4,7 +4,7 @@
 # Public voice session API.
 #
 # Provides lifecycle, input contracts, and event stream/poll APIs.
-# Runtime/provider transport wiring is added in later phases.
+# Provider transport wiring is delegated to internal adapters.
 class Riffer::Voice::Session
   # Voice model in provider/model format.
   attr_reader :model #: String
@@ -21,17 +21,19 @@ class Riffer::Voice::Session
   # Runtime selection (:auto, :async, :background).
   attr_reader :runtime #: Symbol
 
-  #: (model: String, system_prompt: String, tools: Array[singleton(Riffer::Tool)], config: Hash[Symbol | String, untyped], runtime: Symbol, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync)) -> void
-  def initialize(model:, system_prompt:, tools:, config:, runtime:, runtime_executor:)
+  #: (model: String, system_prompt: String, tools: Array[singleton(Riffer::Tool)], config: Hash[Symbol | String, untyped], runtime: Symbol, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync), adapter: untyped) -> void
+  def initialize(model:, system_prompt:, tools:, config:, runtime:, runtime_executor:, adapter:)
     @model = model
     @system_prompt = system_prompt
     @tools = tools
     @config = config
     @runtime = runtime
     @runtime_executor = runtime_executor
+    @adapter = adapter
     @event_queue = Riffer::Voice::EventQueue.new(mode: queue_mode_for(runtime_executor))
-    @connected = true
+    @connected = false
     @closed = false
+    connect_adapter!
   end
 
   #: () -> Symbol
@@ -54,6 +56,7 @@ class Riffer::Voice::Session
     ensure_open!
     raise Riffer::ArgumentError, "text must be a non-empty String" unless text.is_a?(String) && !text.empty?
 
+    @adapter.send_text_turn(text: text)
     true
   end
 
@@ -63,6 +66,7 @@ class Riffer::Voice::Session
     raise Riffer::ArgumentError, "payload must be a non-empty String" unless payload.is_a?(String) && !payload.empty?
     raise Riffer::ArgumentError, "mime_type must be a non-empty String" unless mime_type.is_a?(String) && !mime_type.empty?
 
+    @adapter.send_audio_chunk(payload: payload, mime_type: mime_type)
     true
   end
 
@@ -70,8 +74,10 @@ class Riffer::Voice::Session
   def send_tool_response(call_id:, result:)
     ensure_open!
     raise Riffer::ArgumentError, "call_id must be a non-empty String" unless call_id.is_a?(String) && !call_id.empty?
+    return false if result.nil?
 
-    !result.nil?
+    @adapter.send_tool_response(call_id: call_id, result: result)
+    true
   end
 
   #: () -> Enumerator[Riffer::Voice::Events::Base, void]
@@ -101,12 +107,46 @@ class Riffer::Voice::Session
     return if closed?
 
     @event_queue.close
-    @runtime_executor.shutdown
-    @closed = true
-    @connected = false
+    begin
+      @adapter.close
+    ensure
+      @runtime_executor.shutdown
+      @closed = true
+      @connected = false
+    end
   end
 
   private
+
+  #: () -> void
+  def connect_adapter!
+    required_methods = [:connect, :send_text_turn, :send_audio_chunk, :send_tool_response, :close]
+    missing_methods = required_methods.reject { |method_name| @adapter.respond_to?(method_name) }
+    unless missing_methods.empty?
+      raise Riffer::ArgumentError, "adapter must respond to: #{required_methods.join(", ")}"
+    end
+
+    connected = @adapter.connect(
+      system_prompt: @system_prompt,
+      tools: @tools,
+      config: @config,
+      on_event: method(:emit_event)
+    )
+    raise Riffer::Error, "Voice adapter failed to connect" unless connected
+
+    @connected = true
+  rescue
+    @event_queue.close
+    begin
+      @adapter.close if @adapter.respond_to?(:close)
+    rescue
+      nil
+    end
+    @runtime_executor.shutdown
+    @closed = true
+    @connected = false
+    raise
+  end
 
   #: ((Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync)) -> Symbol
   def queue_mode_for(runtime_executor)

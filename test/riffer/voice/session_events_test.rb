@@ -1,13 +1,16 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require_relative "../../support/voice/fake_adapter"
 
 describe "Riffer::Voice::Session event APIs" do
+  let(:adapter) { TestSupport::Voice::FakeAdapter.new }
   let(:session) do
     Riffer::Voice.connect(
       model: "openai/gpt-realtime",
       system_prompt: "You are helpful",
-      runtime: :background
+      runtime: :background,
+      adapter_factory: ->(**_kwargs) { adapter }
     )
   end
 
@@ -16,8 +19,9 @@ describe "Riffer::Voice::Session event APIs" do
   end
 
   it "returns pushed events via next_event" do
+    session
     event = Riffer::Voice::Events::OutputTranscript.new(text: "hello")
-    session.send(:emit_event, event)
+    adapter.emit(event)
 
     received = session.next_event(timeout: 0)
     expect(received).must_equal event
@@ -28,10 +32,11 @@ describe "Riffer::Voice::Session event APIs" do
   end
 
   it "yields queued events in order via events enumerator and stops after close" do
+    session
     first = Riffer::Voice::Events::OutputTranscript.new(text: "a")
     second = Riffer::Voice::Events::TurnComplete.new
-    session.send(:emit_event, first)
-    session.send(:emit_event, second)
+    adapter.emit(first)
+    adapter.emit(second)
 
     received = []
     consumer = Thread.new do
@@ -60,17 +65,19 @@ describe "Riffer::Voice::Session event APIs" do
       end
     end.new(:async)
 
+    fiber_adapter = TestSupport::Voice::FakeAdapter.new
     fiber_session = Riffer::Voice::Session.new(
       model: "openai/gpt-realtime",
       system_prompt: "You are helpful",
       tools: [],
       config: {},
       runtime: :async,
-      runtime_executor: runtime_executor
+      runtime_executor: runtime_executor,
+      adapter: fiber_adapter
     )
 
     event = Riffer::Voice::Events::TurnComplete.new
-    fiber_session.send(:emit_event, event)
+    fiber_adapter.emit(event)
 
     expect(fiber_session.next_event(timeout: 0)).must_equal event
     fiber_session.close
