@@ -135,7 +135,7 @@ puts agent.generate("What time is it?")
 
 ## Realtime Voice (Optional)
 
-Realtime voice drivers run over websockets in an Async task context.
+Realtime voice sessions run over websockets and support both async/fiber and background/thread runtimes.
 
 Add Async dependencies to your Gemfile:
 
@@ -157,24 +157,28 @@ end
 Minimal voice session example:
 
 ```ruby
-require 'async'
+session = Riffer::Voice.connect(
+  model: "gemini/gemini-2.5-flash-native-audio-preview-12-2025",
+  system_prompt: "You are a concise voice assistant.",
+  runtime: :auto
+)
 
-Async do
-  driver = Riffer::Voice::Drivers::GeminiLive.new
-  begin
-    driver.connect(
-      system_prompt: "You are a concise voice assistant.",
-      callbacks: {
-        on_output_transcript: ->(event) { puts "[assistant] #{event.text}" },
-        on_error: ->(event) { warn "[voice error] #{event.code}: #{event.message}" }
-      }
-    )
+begin
+  session.send_text_turn(text: "Say hello to the caller.")
 
-    driver.send_text_turn(text: "Say hello to the caller.")
-    # driver.send_audio_chunk(payload: base64_pcm_chunk, mime_type: "audio/pcm;rate=16000")
-  ensure
-    driver&.close(reason: "session_complete")
+  session.events.each do |event|
+    case event
+    when Riffer::Voice::Events::OutputTranscript
+      puts "[assistant] #{event.text}"
+    when Riffer::Voice::Events::TurnComplete
+      break
+    when Riffer::Voice::Events::Error
+      warn "[voice error] #{event.code}: #{event.message}"
+      break
+    end
   end
+ensure
+  session.close
 end
 ```
 
@@ -184,5 +188,5 @@ end
 - [Tools](04_TOOLS.md) - Creating tools with parameters
 - [Messages](05_MESSAGES.md) - Message types and history
 - [Stream Events](06_STREAM_EVENTS.md) - Streaming event types
-- [Realtime Voice](10_REALTIME_VOICE.md) - Voice drivers and events
+- [Realtime Voice](10_REALTIME_VOICE.md) - Voice sessions and events
 - [Providers](../docs_providers/01_PROVIDERS.md) - Provider-specific guides

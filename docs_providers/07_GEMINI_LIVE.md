@@ -1,6 +1,14 @@
-# Gemini Live Voice Driver
+# Gemini Live Voice Sessions
 
-`Riffer::Voice::Drivers::GeminiLive` provides bidirectional realtime voice over Gemini Live websocket sessions.
+Use Gemini Live through the public voice session API:
+
+```ruby
+session = Riffer::Voice.connect(
+  model: "gemini/gemini-2.5-flash-native-audio-preview-12-2025",
+  system_prompt: "You are a helpful voice assistant.",
+  runtime: :auto
+)
+```
 
 ## Installation
 
@@ -22,38 +30,19 @@ Riffer.configure do |config|
 end
 ```
 
-You can also pass `api_key:` directly to the driver constructor.
+## Session Config
 
-## Defaults
-
-| Setting | Default |
-| ------- | ------- |
-| `model` | `gemini-2.5-flash-native-audio-preview-12-2025` |
-| `endpoint` | `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent` |
-| `send_audio_chunk` MIME type | `audio/pcm;rate=16000` |
-
-If the model does not start with `models/`, the driver prefixes it automatically.
-
-## Connect
-
-`connect` sends a `setup` payload and starts a reader task:
+Gemini-specific connect options are passed through `config:`:
 
 ```ruby
-driver = Riffer::Voice::Drivers::GeminiLive.new
-
-driver.connect(
+session = Riffer::Voice.connect(
+  model: "gemini/gemini-2.5-flash-native-audio-preview-12-2025",
   system_prompt: "You are a helpful voice assistant.",
-  tools: [MyTool],
   config: {
     generationConfig: {
       responseModalities: ["AUDIO"],
       temperature: 0.2
     }
-  },
-  callbacks: {
-    on_output_transcript: ->(event) { puts event.text },
-    on_tool_call: ->(event) { puts "Tool: #{event.name}" },
-    on_error: ->(event) { warn "#{event.code}: #{event.message}" }
   }
 )
 ```
@@ -62,41 +51,29 @@ driver.connect(
 
 ```ruby
 # Base64-encoded PCM chunk
-driver.send_audio_chunk(payload: base64_pcm_chunk, mime_type: "audio/pcm;rate=16000")
+session.send_audio_chunk(payload: base64_pcm_chunk, mime_type: "audio/pcm;rate=16000")
 
 # Text turn
-driver.send_text_turn(text: "Summarize this call in one sentence.")
-
-# Tool output for a call requested by the model
-driver.send_tool_response(call_id: "tool_call_id", result: {ok: true})
+session.send_text_turn(text: "Summarize this call in one sentence.")
 ```
 
-## Tool Definitions
+## Tool Calls
 
-The driver accepts:
+Gemini tool calls are surfaced as `Riffer::Voice::Events::ToolCall` with hash-only arguments:
 
-- `Riffer::Tool` classes
-- Hash declarations in Gemini tool format (`functionDeclarations`)
+```ruby
+session.events.each do |event|
+  next unless event.is_a?(Riffer::Voice::Events::ToolCall)
 
-It sanitizes tool schemas by removing unsupported keys such as `additionalProperties`.
-
-## Emitted Events
-
-Gemini payloads are normalized into:
-
-- `AudioChunk`
-- `InputTranscript`
-- `OutputTranscript`
-- `ToolCall`
-- `Interrupt`
-- `TurnComplete`
-- `Usage`
-- `Error`
+  result = MyTool.new.call(context: nil, **event.arguments_hash.transform_keys(&:to_sym))
+  session.send_tool_response(call_id: event.call_id, result: result)
+end
+```
 
 ## Closing
 
 ```ruby
-driver.close(reason: "session_complete")
+session.close
 ```
 
 `close` is idempotent and safe to call multiple times.

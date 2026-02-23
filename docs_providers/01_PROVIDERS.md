@@ -12,18 +12,20 @@ Providers are adapters that connect Riffer to LLM services. They implement a com
 | Mock           | `mock`           | None                     |
 
 
-## Realtime Voice Drivers
+## Realtime Voice Sessions
 
-Riffer also includes realtime voice drivers under `Riffer::Voice::Drivers`.
+Riffer also includes provider-neutral realtime voice sessions under `Riffer::Voice`.
 
-| Voice Driver | Identifier | Notes |
-| ------------ | ---------- | ----- |
-| Gemini Live | `gemini_live` | Native audio bidirectional websocket driver |
-| OpenAI Realtime GA | `openai_realtime` | Realtime GA websocket driver |
+Use `Riffer::Voice.connect` with voice-specific provider/model identifiers:
 
-Voice drivers are separate from text providers (`Riffer::Providers`) and use an event-based callback contract.
+| Voice Provider | Model Prefix | Notes |
+| -------------- | ------------ | ----- |
+| Gemini Live | `gemini/...` | Native audio bidirectional websocket support |
+| OpenAI Realtime GA | `openai/...` | Realtime GA websocket support |
 
-Gemini support is currently available through the realtime voice driver (`gemini_live`). A `Riffer::Providers::Gemini` text provider is not part of this release.
+Voice sessions are separate from text providers (`Riffer::Providers`).
+
+Gemini support is currently available through realtime voice sessions (`gemini/...`). A `Riffer::Providers::Gemini` text provider is not part of this release.
 
 ## Model String Format
 
@@ -180,6 +182,6 @@ Riffer::Providers::Repository.find(:mock)
 - [OpenAI](04_OPENAI.md) - GPT models
 - [Mock](05_MOCK_PROVIDER.md) - Mock provider for testing
 - [Custom Providers](06_CUSTOM_PROVIDERS.md) - Creating your own provider
-- [Gemini Live Voice Driver](07_GEMINI_LIVE.md) - Realtime Gemini websocket voice integration
-- [OpenAI Realtime Voice Driver](08_OPENAI_REALTIME.md) - Realtime OpenAI websocket voice integration
-- [Realtime Voice Overview](../docs/10_REALTIME_VOICE.md) - Voice architecture and callback contract
+- [Gemini Live Voice Sessions](07_GEMINI_LIVE.md) - Realtime Gemini voice session usage
+- [OpenAI Realtime Voice Sessions](08_OPENAI_REALTIME.md) - Realtime OpenAI voice session usage
+- [Realtime Voice Overview](../docs/10_REALTIME_VOICE.md) - Voice session API and events

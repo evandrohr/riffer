@@ -51,7 +51,7 @@ end
 This key is used by:
 
 - `Riffer::Providers::OpenAI` for text generation and streaming
-- `Riffer::Voice::Drivers::OpenAIRealtime` for realtime voice sessions
+- `Riffer::Voice.connect(model: "openai/...")` for realtime voice sessions
 
 ### Amazon Bedrock
 
@@ -93,11 +93,11 @@ Riffer.configure do |config|
 end
 ```
 
-This key is used by `Riffer::Voice::Drivers::GeminiLive` for realtime voice sessions.
+This key is used by `Riffer::Voice.connect(model: "gemini/...")` for realtime voice sessions.
 
 ## Realtime Voice Runtime Dependencies
 
-Realtime voice drivers require an Async runtime and websocket libraries at runtime:
+Realtime voice sessions require Async websocket libraries at runtime:
 
 ```ruby
 gem 'async'
@@ -105,7 +105,13 @@ gem 'async-http'
 gem 'async-websocket'
 ```
 
-If these gems are missing, `Riffer::Voice::Transports::AsyncWebsocket` raises a dependency load error when connecting.
+Runtime mode support:
+
+- `runtime: :auto` uses async/fiber when available and falls back to background/thread runtime
+- `runtime: :async` requires an active Async task
+- `runtime: :background` always uses background/thread runtime
+
+If runtime dependencies are missing, voice connect fails with a dependency load error when transport starts.
 
 ## Agent-Level Configuration
 

@@ -74,14 +74,16 @@ See [Providers](../docs_providers/01_PROVIDERS.md) for details.
 
 ### Realtime Voice
 
-Riffer also includes a provider-neutral realtime voice subsystem (`Riffer::Voice`) with typed events and websocket drivers.
+Riffer also includes a provider-neutral realtime voice subsystem (`Riffer::Voice`) with a single session-first API.
 
 ```ruby
-driver = Riffer::Voice::Drivers::Repository.find(:gemini_live).new
-# or: Riffer::Voice::Drivers::Repository.find(:openai_realtime).new
+session = Riffer::Voice.connect(
+  model: "openai/gpt-realtime",
+  system_prompt: "You are a concise voice assistant."
+)
 ```
 
-Voice drivers are separate from `Riffer::Agent` text generation and use callback-based event handling.
+Voice sessions are separate from `Riffer::Agent` text generation and consume typed events via `session.events` or `session.next_event`.
 
 See [Realtime Voice](10_REALTIME_VOICE.md) for details.
 
@@ -144,4 +146,4 @@ Response
 - [Agents](03_AGENTS.md) - Agent configuration and usage
 - [Tools](04_TOOLS.md) - Creating tools
 - [Configuration](07_CONFIGURATION.md) - Global configuration
-- [Realtime Voice](10_REALTIME_VOICE.md) - Realtime voice drivers and events
+- [Realtime Voice](10_REALTIME_VOICE.md) - Realtime voice session API and events

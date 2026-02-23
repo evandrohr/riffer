@@ -1,6 +1,14 @@
-# OpenAI Realtime Voice Driver
+# OpenAI Realtime Voice Sessions
 
-`Riffer::Voice::Drivers::OpenAIRealtime` provides realtime voice sessions using OpenAI Realtime GA websocket APIs.
+Use OpenAI Realtime through the public voice session API:
+
+```ruby
+session = Riffer::Voice.connect(
+  model: "openai/gpt-realtime",
+  system_prompt: "You are a concise voice assistant.",
+  runtime: :auto
+)
+```
 
 ## Installation
 
@@ -22,28 +30,14 @@ Riffer.configure do |config|
 end
 ```
 
-You can also pass `api_key:` directly to the driver constructor.
+## Session Config
 
-## Defaults
-
-| Setting | Default |
-| ------- | ------- |
-| `model` | `gpt-realtime` |
-| `endpoint` | `wss://api.openai.com/v1/realtime` |
-| Session `audio.input.format` | `{type: "audio/pcm", rate: 24000}` |
-| Session `audio.output.format` | `{type: "audio/pcm", rate: 24000}` |
-| `send_audio_chunk` MIME type | `audio/pcm` |
-
-## Connect
-
-`connect` sends a `session.update` payload and starts a reader task:
+OpenAI-specific connect options are passed through `config:`:
 
 ```ruby
-driver = Riffer::Voice::Drivers::OpenAIRealtime.new
-
-driver.connect(
+session = Riffer::Voice.connect(
+  model: "openai/gpt-realtime",
   system_prompt: "You are a concise voice assistant.",
-  tools: [MyTool],
   config: {
     audio: {
       input: {
@@ -51,11 +45,6 @@ driver.connect(
       }
     },
     temperature: 0.3
-  },
-  callbacks: {
-    on_output_transcript: ->(event) { puts event.text },
-    on_tool_call: ->(event) { puts "Tool: #{event.name}" },
-    on_error: ->(event) { warn "#{event.code}: #{event.message}" }
   }
 )
 ```
@@ -64,34 +53,31 @@ driver.connect(
 
 ```ruby
 # Base64-encoded PCM chunk
-driver.send_audio_chunk(payload: base64_pcm_chunk, mime_type: "audio/pcm")
+session.send_audio_chunk(payload: base64_pcm_chunk, mime_type: "audio/pcm")
 
 # Text turn
-driver.send_text_turn(text: "Summarize this call in one sentence.")
-
-# Tool output for a call requested by the model
-driver.send_tool_response(call_id: "tool_call_id", result: {ok: true})
+session.send_text_turn(text: "Summarize this call in one sentence.")
 ```
 
-`send_tool_response` writes both the tool output item and a follow-up `response.create` message.
+## Tool Calls
 
-## Emitted Events
+OpenAI tool calls are surfaced as `Riffer::Voice::Events::ToolCall` with hash-only arguments:
 
-OpenAI payloads are normalized into:
+```ruby
+session.events.each do |event|
+  next unless event.is_a?(Riffer::Voice::Events::ToolCall)
 
-- `AudioChunk`
-- `InputTranscript`
-- `OutputTranscript`
-- `ToolCall`
-- `Interrupt`
-- `TurnComplete`
-- `Usage`
-- `Error`
+  result = MyTool.new.call(context: nil, **event.arguments_hash.transform_keys(&:to_sym))
+  session.send_tool_response(call_id: event.call_id, result: result)
+end
+```
+
+`send_tool_response` forwards tool output and allows the provider runtime to continue generation.
 
 ## Closing
 
 ```ruby
-driver.close(reason: "session_complete")
+session.close
 ```
 
 `close` is idempotent and safe to call multiple times.

@@ -1,30 +1,16 @@
 # Realtime Voice
 
-Riffer includes a provider-neutral realtime voice subsystem under `Riffer::Voice`.
+Riffer provides a provider-neutral realtime voice API under `Riffer::Voice`.
 
-It is built around:
+Use one public entry point:
 
-- Voice drivers (`Riffer::Voice::Drivers::*`)
-- Typed realtime events (`Riffer::Voice::Events::*`)
-- Async websocket transport (`Riffer::Voice::Transports::AsyncWebsocket`)
-
-## Available Drivers
-
-| Driver Class | Repository Identifier | Provider |
-| ------------ | --------------------- | -------- |
-| `Riffer::Voice::Drivers::GeminiLive` | `:gemini_live` | Gemini Live |
-| `Riffer::Voice::Drivers::OpenAIRealtime` | `:openai_realtime` | OpenAI Realtime GA |
-
-Use the voice driver repository to resolve drivers dynamically:
-
-```ruby
-driver_class = Riffer::Voice::Drivers::Repository.find(:gemini_live)
-driver = driver_class.new
-```
+- `Riffer::Voice.connect(...)`
+- `Riffer::Voice::Session` for send/receive/close lifecycle
+- typed events under `Riffer::Voice::Events::*`
 
 ## Runtime Dependencies
 
-Realtime voice requires Async websocket libraries at runtime:
+Realtime voice uses Async websocket transport internally. Add these gems:
 
 ```ruby
 gem 'async'
@@ -34,7 +20,7 @@ gem 'async-websocket'
 
 ## Configuration
 
-Configure API keys globally:
+Set provider API keys globally:
 
 ```ruby
 Riffer.configure do |config|
@@ -43,40 +29,38 @@ Riffer.configure do |config|
 end
 ```
 
-## Driver Lifecycle
+## Model Format
 
-All drivers implement the same core lifecycle:
+Voice models must use `provider/model` format:
 
-1. `connect(system_prompt:, tools:, config:, callbacks:)`
+- `openai/gpt-realtime`
+- `gemini/gemini-2.5-flash-native-audio-preview-12-2025`
+
+Legacy prefixes such as `openai_realtime/*` and `gemini_live/*` are not supported.
+
+## Runtime Modes
+
+`Riffer::Voice.connect` supports both async/fiber and background/thread execution.
+
+| Mode | Behavior |
+| ---- | -------- |
+| `:auto` (default) | use current Async task when present; otherwise run background runtime |
+| `:async` | require active Async task (fiber-based) |
+| `:background` | always run background runtime (thread-based) |
+
+## Session Lifecycle
+
+`Riffer::Voice::Session` methods:
+
+1. `send_text_turn(text:)`
 2. `send_audio_chunk(payload:, mime_type:)`
-3. `send_text_turn(text:, role:)`
-4. `send_tool_response(call_id:, result:)`
-5. `close(reason:)`
-
-`connect` must run inside an Async task context.
-
-## Callbacks
-
-Callbacks are configured via `callbacks:` in `connect`.
-
-| Callback | Event Class |
-| -------- | ----------- |
-| `on_event` | Any `Riffer::Voice::Events::Base` subclass |
-| `on_audio_chunk` | `Riffer::Voice::Events::AudioChunk` |
-| `on_input_transcript` | `Riffer::Voice::Events::InputTranscript` |
-| `on_output_transcript` | `Riffer::Voice::Events::OutputTranscript` |
-| `on_tool_call` | `Riffer::Voice::Events::ToolCall` |
-| `on_interrupt` | `Riffer::Voice::Events::Interrupt` |
-| `on_turn_complete` | `Riffer::Voice::Events::TurnComplete` |
-| `on_usage` | `Riffer::Voice::Events::Usage` |
-| `on_error` | `Riffer::Voice::Events::Error` |
+3. `send_tool_response(call_id:, result:)`
+4. `events` (Enumerator) and `next_event(timeout:)`
+5. `close`
 
 ## End-to-End Example
 
 ```ruby
-require 'async'
-require 'json'
-
 class LookupWeatherTool < Riffer::Tool
   description "Looks up weather for a city"
 
@@ -89,38 +73,48 @@ class LookupWeatherTool < Riffer::Tool
   end
 end
 
-Async do
-  driver = Riffer::Voice::Drivers::GeminiLive.new
+session = Riffer::Voice.connect(
+  model: "gemini/gemini-2.5-flash-native-audio-preview-12-2025",
+  system_prompt: "You are a concise voice assistant.",
+  tools: [LookupWeatherTool],
+  runtime: :auto
+)
 
-  begin
-    driver.connect(
-      system_prompt: "You are a concise voice assistant.",
-      tools: [LookupWeatherTool],
-      callbacks: {
-        on_output_transcript: ->(event) { puts "[assistant] #{event.text}" },
-        on_tool_call: lambda do |event|
-          args = event.arguments.is_a?(String) ? JSON.parse(event.arguments) : event.arguments
-          result = LookupWeatherTool.new.call(context: nil, city: args.fetch("city", args[:city]))
-          driver.send_tool_response(call_id: event.call_id, result: result)
-        end,
-        on_error: ->(event) { warn "[voice error] #{event.code}: #{event.message}" }
-      }
-    )
+begin
+  session.send_text_turn(text: "What is the weather in Toronto?")
 
-    # Text turn
-    driver.send_text_turn(text: "What is the weather in Toronto?")
-
-    # Audio turn (base64-encoded PCM payload)
-    # driver.send_audio_chunk(payload: base64_pcm_chunk, mime_type: "audio/pcm;rate=16000")
-
-    sleep 2
-  ensure
-    driver&.close(reason: "session_complete")
+  session.events.each do |event|
+    case event
+    when Riffer::Voice::Events::OutputTranscript
+      puts "[assistant] #{event.text}"
+    when Riffer::Voice::Events::ToolCall
+      result = LookupWeatherTool.new.call(context: nil, **event.arguments_hash.transform_keys(&:to_sym))
+      session.send_tool_response(call_id: event.call_id, result: result)
+    when Riffer::Voice::Events::Error
+      warn "[voice error] #{event.code}: #{event.message}"
+    when Riffer::Voice::Events::TurnComplete
+      break
+    end
   end
+ensure
+  session.close
 end
 ```
 
+## Event Types
+
+Voice providers normalize payloads into:
+
+- `AudioChunk`
+- `InputTranscript`
+- `OutputTranscript`
+- `ToolCall`
+- `Interrupt`
+- `TurnComplete`
+- `Usage`
+- `Error`
+
 ## Provider-Specific Guides
 
-- [Gemini Live Voice Driver](../docs_providers/07_GEMINI_LIVE.md)
-- [OpenAI Realtime Voice Driver](../docs_providers/08_OPENAI_REALTIME.md)
+- [Gemini Live Voice Sessions](../docs_providers/07_GEMINI_LIVE.md)
+- [OpenAI Realtime Voice Sessions](../docs_providers/08_OPENAI_REALTIME.md)
