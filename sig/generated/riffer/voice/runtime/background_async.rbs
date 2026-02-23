@@ -1,0 +1,32 @@
+# Generated from lib/riffer/voice/runtime/background_async.rb with RBS::Inline
+
+# Runtime strategy that manages a background worker thread.
+class Riffer::Voice::Runtime::BackgroundAsync
+  SHUTDOWN_SIGNAL: Object
+
+  # Background worker thread.
+  attr_reader thread: Thread
+
+  # : () -> void
+  def initialize: () -> void
+
+  # : () -> Symbol
+  def kind: () -> Symbol
+
+  # : () -> bool
+  def background?: () -> bool
+
+  # : () -> bool
+  def closed?: () -> bool
+
+  # : () { () -> untyped } -> bool
+  def schedule: () { () -> untyped } -> bool
+
+  # : () -> bool
+  def shutdown: () -> bool
+
+  private
+
+  # : () -> void
+  def run_loop: () -> void
+end

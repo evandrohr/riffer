@@ -86,8 +86,8 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
   # : (Hash[String, untyped], type: String) -> Array[Riffer::Voice::Events::Base]
   def parse_interrupt: (Hash[String, untyped], type: String) -> Array[Riffer::Voice::Events::Base]
 
-  # : (untyped) -> (String | Hash[Symbol | String, untyped])
-  def parse_arguments: (untyped) -> (String | Hash[Symbol | String, untyped])
+  # : (untyped) -> Hash[String, untyped]
+  def parse_arguments: (untyped) -> Hash[String, untyped]
 
   # : (String) -> bool
   def retriable_error?: (String) -> bool

@@ -1,0 +1,66 @@
+# Generated from lib/riffer/voice/session.rb with RBS::Inline
+
+# Public voice session API.
+#
+# Provides lifecycle, input contracts, and event stream/poll APIs.
+# Provider transport wiring is delegated to internal adapters.
+class Riffer::Voice::Session
+  # Voice model in provider/model format.
+  attr_reader model: String
+
+  # System prompt used for session setup.
+  attr_reader system_prompt: String
+
+  # Tool classes available to the session.
+  attr_reader tools: Array[singleton(Riffer::Tool)]
+
+  # Provider/runtime config payload.
+  attr_reader config: Hash[Symbol | String, untyped]
+
+  # Runtime selection (:auto, :async, :background).
+  attr_reader runtime: Symbol
+
+  # : (model: String, system_prompt: String, tools: Array[singleton(Riffer::Tool)], config: Hash[Symbol | String, untyped], runtime: Symbol, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync), adapter: untyped) -> void
+  def initialize: (model: String, system_prompt: String, tools: Array[singleton(Riffer::Tool)], config: Hash[Symbol | String, untyped], runtime: Symbol, runtime_executor: Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync, adapter: untyped) -> void
+
+  # : () -> Symbol
+  def runtime_kind: () -> Symbol
+
+  # : () -> bool
+  def connected?: () -> bool
+
+  # : () -> bool
+  def closed?: () -> bool
+
+  # : (text: String) -> bool
+  def send_text_turn: (text: String) -> bool
+
+  # : (payload: String, mime_type: String) -> bool
+  def send_audio_chunk: (payload: String, mime_type: String) -> bool
+
+  # : (call_id: String, result: untyped) -> bool
+  def send_tool_response: (call_id: String, result: untyped) -> bool
+
+  # : () -> Enumerator[Riffer::Voice::Events::Base, void]
+  def events: () -> Enumerator[Riffer::Voice::Events::Base, void]
+
+  # : (?timeout: Numeric?) -> Riffer::Voice::Events::Base?
+  def next_event: (?timeout: Numeric?) -> Riffer::Voice::Events::Base?
+
+  # : () -> void
+  def close: () -> void
+
+  private
+
+  # : () -> void
+  def connect_adapter!: () -> void
+
+  # : ((Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync)) -> Symbol
+  def queue_mode_for: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync) -> Symbol
+
+  # : (Riffer::Voice::Events::Base) -> Riffer::Voice::Events::Base
+  def emit_event: (Riffer::Voice::Events::Base) -> Riffer::Voice::Events::Base
+
+  # : () -> void
+  def ensure_open!: () -> void
+end

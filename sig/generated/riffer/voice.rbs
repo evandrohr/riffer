@@ -4,4 +4,14 @@
 #
 # Voice support is additive and provider-neutral.
 module Riffer::Voice
+  SUPPORTED_RUNTIMES: Array[Symbol]
+
+  # : (model: String, system_prompt: String, ?tools: Array[singleton(Riffer::Tool)], ?config: Hash[Symbol | String, untyped], ?runtime: Symbol, ?adapter_factory: ^(adapter_identifier: Symbol, model: String, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync)) -> untyped) -> Riffer::Voice::Session
+  def self.connect: (model: String, system_prompt: String, ?tools: Array[singleton(Riffer::Tool)], ?config: Hash[Symbol | String, untyped], ?runtime: Symbol, ?adapter_factory: ^(adapter_identifier: Symbol, model: String, runtime_executor: Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync) -> untyped) -> Riffer::Voice::Session
+
+  # : (model: String, system_prompt: String, tools: Array[singleton(Riffer::Tool)], config: Hash[Symbol | String, untyped], runtime: Symbol, adapter_factory: untyped) -> void
+  def self.validate_connect_input!: (model: String, system_prompt: String, tools: Array[singleton(Riffer::Tool)], config: Hash[Symbol | String, untyped], runtime: Symbol, adapter_factory: untyped) -> void
+
+  # : (adapter_identifier: Symbol, model: String, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync), adapter_factory: untyped) -> untyped
+  def self.build_adapter: (adapter_identifier: Symbol, model: String, runtime_executor: Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync, adapter_factory: untyped) -> untyped
 end

@@ -1,0 +1,46 @@
+# Generated from lib/riffer/voice/transports/thread_websocket.rb with RBS::Inline
+
+# Thread-backed websocket transport for realtime voice drivers.
+class Riffer::Voice::Transports::ThreadWebsocket
+  extend Riffer::Helpers::Dependencies
+
+  CLOSE_SENTINEL: Object
+
+  # Managed websocket client handle.
+  attr_reader client: untyped
+
+  # : (client: untyped, read_queue: Queue[untyped]) -> void
+  def initialize: (client: untyped, read_queue: Queue[untyped]) -> void
+
+  # : (url: String, ?headers: Hash[String, String]) -> Riffer::Voice::Transports::ThreadWebsocket
+  def self.connect: (url: String, ?headers: Hash[String, String]) -> Riffer::Voice::Transports::ThreadWebsocket
+
+  # : (url: String, headers: Hash[String, String]) -> untyped
+  def self.connect_with_headers: (url: String, headers: Hash[String, String]) -> untyped
+
+  # : (url: String, headers: Hash[String, String]) -> untyped
+  def self.build_client: (url: String, headers: Hash[String, String]) -> untyped
+
+  # : () -> void
+  def self.load_dependencies!: () -> void
+
+  # : () -> untyped
+  def read: () -> untyped
+
+  # : (Hash[String, untyped]) -> void
+  def write_json: (Hash[String, untyped]) -> void
+
+  # : () -> void
+  def close: () -> void
+
+  private
+
+  # : () -> void
+  def bind_client_callbacks: () -> void
+
+  # : (untyped) -> untyped
+  def extract_payload: (untyped) -> untyped
+
+  # : (untyped) -> Exception
+  def normalize_error: (untyped) -> Exception
+end

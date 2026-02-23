@@ -1,0 +1,5 @@
+# Generated from lib/riffer/voice/runtime.rb with RBS::Inline
+
+# Namespace for voice runtime mode implementations.
+module Riffer::Voice::Runtime
+end

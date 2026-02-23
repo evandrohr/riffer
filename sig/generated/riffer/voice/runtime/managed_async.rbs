@@ -1,0 +1,25 @@
+# Generated from lib/riffer/voice/runtime/managed_async.rb with RBS::Inline
+
+# Runtime strategy that reuses an existing Async task context.
+class Riffer::Voice::Runtime::ManagedAsync
+  # The current Async task.
+  attr_reader task: untyped
+
+  # : (task: untyped) -> void
+  def initialize: (task: untyped) -> void
+
+  # : () -> Symbol
+  def kind: () -> Symbol
+
+  # : () -> bool
+  def background?: () -> bool
+
+  # : () -> bool
+  def closed?: () -> bool
+
+  # : () { () -> untyped } -> untyped
+  def schedule: () { () -> untyped } -> untyped
+
+  # : () -> bool
+  def shutdown: () -> bool
+end

@@ -1,0 +1,30 @@
+# Generated from lib/riffer/voice/adapters/gemini_live.rb with RBS::Inline
+
+# Internal adapter for Gemini Live voice provider.
+class Riffer::Voice::Adapters::GeminiLive < Riffer::Voice::Adapters::Base
+  # : (model: String, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync), ?driver_factory: ^(model: String, task_resolver: ^() -> untyped, transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, logger: untyped) -> untyped, ?logger: untyped) -> void
+  def initialize: (model: String, runtime_executor: Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync, ?driver_factory: ^(model: String, task_resolver: ^() -> untyped, transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, logger: untyped) -> untyped, ?logger: untyped) -> void
+
+  # : (system_prompt: String, on_event: ^(Riffer::Voice::Events::Base) -> void, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], ?config: Hash[Symbol | String, untyped]) -> bool
+  def connect: (system_prompt: String, on_event: ^(Riffer::Voice::Events::Base) -> void, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], ?config: Hash[Symbol | String, untyped]) -> bool
+
+  # : () -> bool
+  def connected?: () -> bool
+
+  # : (text: String) -> void
+  def send_text_turn: (text: String) -> void
+
+  # : (payload: String, mime_type: String) -> void
+  def send_audio_chunk: (payload: String, mime_type: String) -> void
+
+  # : (call_id: String, result: untyped) -> void
+  def send_tool_response: (call_id: String, result: untyped) -> void
+
+  # : () -> void
+  def close: () -> void
+
+  private
+
+  # : (model: String, task_resolver: ^() -> untyped, transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, logger: untyped) -> Riffer::Voice::Drivers::GeminiLive
+  def build_driver: (model: String, task_resolver: ^() -> untyped, transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, logger: untyped) -> Riffer::Voice::Drivers::GeminiLive
+end

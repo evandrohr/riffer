@@ -1,0 +1,17 @@
+# Generated from lib/riffer/voice/model_resolver.rb with RBS::Inline
+
+# Resolves voice model identifiers into provider adapter configuration.
+class Riffer::Voice::ModelResolver
+  RESOLUTIONS: Hash[String, Hash[Symbol, Symbol]]
+
+  LEGACY_PROVIDERS: Array[String]
+
+  # : (model: String, ?validate_config: bool) -> Hash[Symbol, String | Symbol]
+  def self.resolve: (model: String, ?validate_config: bool) -> Hash[Symbol, String | Symbol]
+
+  # : (String) -> [String, String]
+  def self.parse_model: (String) -> [ String, String ]
+
+  # : (provider: String, config_key: Symbol) -> void
+  def self.validate_provider_configuration!: (provider: String, config_key: Symbol) -> void
+end

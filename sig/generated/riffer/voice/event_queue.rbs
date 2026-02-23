@@ -1,0 +1,35 @@
+# Generated from lib/riffer/voice/event_queue.rb with RBS::Inline
+
+# Thread-safe queue for voice events with timeout and close semantics.
+class Riffer::Voice::EventQueue
+  DEFAULT_FIBER_POLL_INTERVAL: Float
+
+  # : (?mode: Symbol, ?fiber_poll_interval: Numeric) -> void
+  def initialize: (?mode: Symbol, ?fiber_poll_interval: Numeric) -> void
+
+  # : (Riffer::Voice::Events::Base) -> bool
+  def push: (Riffer::Voice::Events::Base) -> bool
+
+  # : (?timeout: Numeric?) -> Riffer::Voice::Events::Base?
+  def pop: (?timeout: Numeric?) -> Riffer::Voice::Events::Base?
+
+  # : () -> bool
+  def close: () -> bool
+
+  # : () -> bool
+  def closed?: () -> bool
+
+  private
+
+  # : (?timeout: Numeric?) -> Riffer::Voice::Events::Base?
+  def pop_thread: (?timeout: Numeric?) -> Riffer::Voice::Events::Base?
+
+  # : (?timeout: Numeric?) -> Riffer::Voice::Events::Base?
+  def pop_fiber: (?timeout: Numeric?) -> Riffer::Voice::Events::Base?
+
+  # : (Numeric?) -> void
+  def wait_for_event: (Numeric?) -> void
+
+  # : () -> Float
+  def monotonic_now: () -> Float
+end

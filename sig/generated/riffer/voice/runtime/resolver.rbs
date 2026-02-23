@@ -1,0 +1,10 @@
+# Generated from lib/riffer/voice/runtime/resolver.rb with RBS::Inline
+
+# Resolves runtime mode into a concrete runtime strategy object.
+class Riffer::Voice::Runtime::Resolver
+  # : (requested_mode: Symbol, ?task_resolver: ^() -> untyped) -> (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync)
+  def self.resolve: (requested_mode: Symbol, ?task_resolver: ^() -> untyped) -> (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync)
+
+  # : () -> untyped
+  def self.default_task: () -> untyped
+end

@@ -2,6 +2,8 @@
 
 # Async websocket transport for realtime voice drivers.
 class Riffer::Voice::Transports::AsyncWebsocket
+  extend Riffer::Helpers::Dependencies
+
   HTTP1_ALPN: Array[String]
 
   # Managed websocket connection handles.
@@ -18,6 +20,9 @@ class Riffer::Voice::Transports::AsyncWebsocket
 
   # : (client: untyped, endpoint: untyped, headers: Hash[String, String]) -> untyped
   def self.connect_with_headers: (client: untyped, endpoint: untyped, headers: Hash[String, String]) -> untyped
+
+  # : () -> void
+  def self.load_dependencies!: () -> void
 
   # : () -> untyped
   def read: () -> untyped

@@ -1,0 +1,9 @@
+# Generated from lib/riffer/voice/adapters/repository.rb with RBS::Inline
+
+# Registry for internal realtime voice adapters.
+class Riffer::Voice::Adapters::Repository
+  REPO: Hash[Symbol, ^() -> singleton(Riffer::Voice::Adapters::Base)]
+
+  # : ((String | Symbol)) -> singleton(Riffer::Voice::Adapters::Base)?
+  def self.find: (String | Symbol) -> singleton(Riffer::Voice::Adapters::Base)?
+end

@@ -67,6 +67,9 @@ class Riffer::Voice::Parsers::GeminiLiveParser < Riffer::Voice::Parsers::Base
   # : (Hash[String, untyped], Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
   def extract_tool_calls: (Hash[String, untyped], Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
 
+  # : (untyped) -> Hash[String, untyped]
+  def parse_arguments: (untyped) -> Hash[String, untyped]
+
   # : (Hash[String, untyped], Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
   def extract_interrupt: (Hash[String, untyped], Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
 

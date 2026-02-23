@@ -1,0 +1,5 @@
+# Generated from lib/riffer/voice/adapters.rb with RBS::Inline
+
+# Namespace for internal realtime voice provider adapters.
+module Riffer::Voice::Adapters
+end
