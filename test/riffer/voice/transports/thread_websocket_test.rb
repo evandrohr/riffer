@@ -36,8 +36,8 @@ describe Riffer::Voice::Transports::ThreadWebsocket do
 
       error = with_overridden_class_method(
         klass: transport_class,
-        method_name: :require,
-        implementation: ->(_name) { raise LoadError, "cannot load such file -- websocket-client-simple" }
+        method_name: :depends_on,
+        implementation: ->(*_args, **_kwargs) { raise Riffer::Helpers::Dependencies::LoadError, "Could not load websocket-client-simple" }
       ) do
         expect {
           transport_class.connect(url: "wss://example.test/realtime")
@@ -53,7 +53,7 @@ describe Riffer::Voice::Transports::ThreadWebsocket do
       build_calls = []
       transport = nil
 
-      with_overridden_class_method(klass: transport_class, method_name: :require, implementation: ->(_name) { true }) do
+      with_overridden_class_method(klass: transport_class, method_name: :depends_on, implementation: ->(*_args, **_kwargs) { true }) do
         with_overridden_class_method(
           klass: transport_class,
           method_name: :build_client,

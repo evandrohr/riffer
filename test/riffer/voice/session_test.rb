@@ -129,8 +129,8 @@ describe Riffer::Voice::Session do
       expect(adapter.tool_responses).must_equal([{call_id: "call_1", result: {ok: true}}])
     end
 
-    it "does not send nil tool response payloads" do
-      expect(session.send_tool_response(call_id: "call_1", result: nil)).must_equal false
+    it "raises when tool response payload is nil" do
+      expect { session.send_tool_response(call_id: "call_1", result: nil) }.must_raise Riffer::ArgumentError
       expect(adapter.tool_responses).must_equal []
     end
 

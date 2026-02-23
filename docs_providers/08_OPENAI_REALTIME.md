@@ -12,12 +12,16 @@ session = Riffer::Voice.connect(
 
 ## Installation
 
-Add Async websocket dependencies:
+Add runtime websocket dependencies:
 
 ```ruby
+# For async/fiber runtime (:async, or :auto with Async task)
 gem 'async'
 gem 'async-http'
 gem 'async-websocket'
+
+# For background/thread runtime (:background, or :auto without Async task)
+gem 'websocket-client-simple'
 ```
 
 ## Configuration

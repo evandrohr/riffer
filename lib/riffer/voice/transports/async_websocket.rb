@@ -3,6 +3,8 @@
 
 # Async websocket transport for realtime voice drivers.
 class Riffer::Voice::Transports::AsyncWebsocket
+  extend Riffer::Helpers::Dependencies
+
   HTTP1_ALPN = ["http/1.1"].freeze #: Array[String]
 
   # Managed websocket connection handles.
@@ -19,14 +21,7 @@ class Riffer::Voice::Transports::AsyncWebsocket
 
   #: (url: String, ?headers: Hash[String, String]) -> Riffer::Voice::Transports::AsyncWebsocket
   def self.connect(url:, headers: {})
-    begin
-      require "async/http/endpoint"
-      require "async/http/protocol/https"
-      require "async/websocket/client"
-    rescue LoadError
-      raise Riffer::Helpers::Dependencies::LoadError,
-        "Could not load async websocket dependencies. Add 'async', 'async-http', and 'async-websocket' to your Gemfile."
-    end
+    load_dependencies!
 
     endpoint = Async::HTTP::Endpoint.parse(
       url,
@@ -59,6 +54,18 @@ class Riffer::Voice::Transports::AsyncWebsocket
   end
 
   private_class_method :connect_with_headers
+
+  #: () -> void
+  def self.load_dependencies!
+    depends_on "async"
+    depends_on "async-http", req: "async/http/endpoint"
+    require "async/http/protocol/https"
+    depends_on "async-websocket", req: "async/websocket/client"
+  rescue Riffer::Helpers::Dependencies::LoadError, LoadError
+    raise Riffer::Helpers::Dependencies::LoadError,
+      "Could not load async websocket dependencies. Add 'async', 'async-http', and 'async-websocket' to your Gemfile."
+  end
+  private_class_method :load_dependencies!
 
   #: () -> untyped
   def read

@@ -137,12 +137,16 @@ puts agent.generate("What time is it?")
 
 Realtime voice sessions run over websockets and support both async/fiber and background/thread runtimes.
 
-Add Async dependencies to your Gemfile:
+Add runtime websocket dependencies to your Gemfile:
 
 ```ruby
+# For async/fiber runtime (:async, or :auto with Async task)
 gem 'async'
 gem 'async-http'
 gem 'async-websocket'
+
+# For background/thread runtime (:background, or :auto without Async task)
+gem 'websocket-client-simple'
 ```
 
 Configure credentials:

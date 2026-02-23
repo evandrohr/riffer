@@ -7,17 +7,17 @@ describe Riffer::Voice::Transports::AsyncWebsocket do
     it "preserves dependency load errors for missing async gems" do
       transport_class = Riffer::Voice::Transports::AsyncWebsocket
 
-      transport_class.define_singleton_method(:require) do |_name|
-        raise LoadError, "cannot load such file -- async/http/endpoint"
+      error = with_overridden_class_method(
+        klass: transport_class,
+        method_name: :depends_on,
+        implementation: ->(*_args, **_kwargs) { raise Riffer::Helpers::Dependencies::LoadError, "Could not load async-http" }
+      ) do
+        expect {
+          transport_class.connect(url: "wss://example.test/realtime")
+        }.must_raise(Riffer::Helpers::Dependencies::LoadError)
       end
 
-      error = expect {
-        transport_class.connect(url: "wss://example.test/realtime")
-      }.must_raise(Riffer::Helpers::Dependencies::LoadError)
-
       expect(error.message).must_include "Could not load async websocket dependencies"
-    ensure
-      transport_class.singleton_class.send(:remove_method, :require)
     end
   end
 
@@ -76,5 +76,21 @@ describe Riffer::Voice::Transports::AsyncWebsocket do
         }
       ]
     end
+  end
+
+  private
+
+  def with_overridden_class_method(klass:, method_name:, implementation:)
+    singleton = klass.singleton_class
+    had_original = singleton.method_defined?(method_name, false) ||
+      singleton.private_method_defined?(method_name, false)
+    original = singleton.instance_method(method_name) if had_original
+
+    singleton.send(:remove_method, method_name) if had_original
+    singleton.send(:define_method, method_name, implementation)
+    yield
+  ensure
+    singleton.send(:remove_method, method_name)
+    singleton.send(:define_method, method_name, original) if had_original
   end
 end

@@ -97,21 +97,23 @@ This key is used by `Riffer::Voice.connect(model: "gemini/...")` for realtime vo
 
 ## Realtime Voice Runtime Dependencies
 
-Realtime voice sessions require Async websocket libraries at runtime:
+Realtime voice transport dependencies depend on runtime mode:
+
+- `runtime: :auto` uses async/fiber when available and falls back to background/thread runtime
+- `runtime: :async` requires an active Async task and async websocket gems
+- `runtime: :background` always uses background/thread runtime and thread websocket gem
 
 ```ruby
+# For async/fiber runtime (:async, or :auto with Async task)
 gem 'async'
 gem 'async-http'
 gem 'async-websocket'
+
+# For background/thread runtime (:background, or :auto without Async task)
+gem 'websocket-client-simple'
 ```
 
-Runtime mode support:
-
-- `runtime: :auto` uses async/fiber when available and falls back to background/thread runtime
-- `runtime: :async` requires an active Async task
-- `runtime: :background` always uses background/thread runtime
-
-If runtime dependencies are missing, voice connect fails with a dependency load error when transport starts.
+If runtime dependencies are missing, voice connection fails with a dependency load error when transport starts.
 
 ## Agent-Level Configuration
 

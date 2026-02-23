@@ -10,12 +10,16 @@ Use one public entry point:
 
 ## Runtime Dependencies
 
-Realtime voice uses Async websocket transport internally. Add these gems:
+Realtime voice selects transport by runtime mode:
 
 ```ruby
+# For async/fiber runtime (:async, or :auto with Async task)
 gem 'async'
 gem 'async-http'
 gem 'async-websocket'
+
+# For background/thread runtime (:background, or :auto without Async task)
+gem 'websocket-client-simple'
 ```
 
 ## Configuration

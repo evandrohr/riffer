@@ -3,6 +3,8 @@
 
 # Thread-backed websocket transport for realtime voice drivers.
 class Riffer::Voice::Transports::ThreadWebsocket
+  extend Riffer::Helpers::Dependencies
+
   CLOSE_SENTINEL = Object.new.freeze #: Object
 
   # Managed websocket client handle.
@@ -17,12 +19,7 @@ class Riffer::Voice::Transports::ThreadWebsocket
 
   #: (url: String, ?headers: Hash[String, String]) -> Riffer::Voice::Transports::ThreadWebsocket
   def self.connect(url:, headers: {})
-    begin
-      require "websocket-client-simple"
-    rescue LoadError
-      raise Riffer::Helpers::Dependencies::LoadError,
-        "Could not load thread websocket dependency. Add 'websocket-client-simple' to your Gemfile."
-    end
+    load_dependencies!
 
     queue = Queue.new
     client = build_client(url: url, headers: headers)
@@ -53,6 +50,15 @@ class Riffer::Voice::Transports::ThreadWebsocket
     connect_with_headers(url: url, headers: headers)
   end
   private_class_method :build_client
+
+  #: () -> void
+  def self.load_dependencies!
+    depends_on "websocket-client-simple", req: "websocket-client-simple"
+  rescue Riffer::Helpers::Dependencies::LoadError, LoadError
+    raise Riffer::Helpers::Dependencies::LoadError,
+      "Could not load thread websocket dependency. Add 'websocket-client-simple' to your Gemfile."
+  end
+  private_class_method :load_dependencies!
 
   #: () -> untyped
   def read

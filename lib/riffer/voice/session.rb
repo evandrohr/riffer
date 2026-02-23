@@ -74,7 +74,7 @@ class Riffer::Voice::Session
   def send_tool_response(call_id:, result:)
     ensure_open!
     raise Riffer::ArgumentError, "call_id must be a non-empty String" unless call_id.is_a?(String) && !call_id.empty?
-    return false if result.nil?
+    raise Riffer::ArgumentError, "result must not be nil" if result.nil?
 
     @adapter.send_tool_response(call_id: call_id, result: result)
     true
