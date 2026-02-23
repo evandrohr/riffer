@@ -4,32 +4,25 @@
 # Base class for all evaluators in the Riffer framework.
 #
 # Provides a DSL for defining evaluator metadata and the evaluate method.
-# Subclasses must implement the +evaluate+ method.
+# Simple evaluators only need to set +instructions+ — the base class
+# handles calling the judge automatically.
 #
 # See Riffer::Evals::Evaluators.
 #
 #   class MyEvaluator < Riffer::Evals::Evaluator
-#     description "Evaluates response quality"
+#     instructions "Assess medical accuracy of the response..."
 #     higher_is_better true
 #     judge_model "anthropic/claude-opus-4-5-20251101"
-#
-#     def evaluate(input:, output:, context: nil)
-#       evaluation = judge.evaluate(
-#         system_prompt: "...",
-#         user_prompt: "..."
-#       )
-#       result(score: evaluation[:score], reason: evaluation[:reason])
-#     end
 #   end
 #
 class Riffer::Evals::Evaluator
   class << self
-    # Gets or sets the evaluator description.
+    # Gets or sets the evaluation instructions (criteria and scoring rubric).
     #
     #: (?String?) -> String?
-    def description(value = nil)
-      return @description if value.nil?
-      @description = value.to_s
+    def instructions(value = nil)
+      return @instructions if value.nil?
+      @instructions = value.to_s
     end
 
     # Gets or sets whether higher scores are better.
@@ -51,11 +44,47 @@ class Riffer::Evals::Evaluator
 
   # Evaluates an input/output pair.
   #
-  # Raises NotImplementedError if not implemented by subclass.
+  # The default implementation calls the judge with the class-level +instructions+.
+  # Override this method for custom evaluation logic (e.g. rule-based evaluators).
   #
-  #: (input: String | Array[Hash[Symbol, untyped] | Riffer::Messages::Base], output: String, ?context: Hash[Symbol, untyped]?) -> Riffer::Evals::Result
-  def evaluate(input:, output:, context: nil)
-    raise NotImplementedError, "#{self.class} must implement #evaluate"
+  # +input+ - the input to evaluate; String or Array of message hashes/Message objects.
+  # +output+ - the agent's response to evaluate.
+  # +ground_truth+ - optional reference answer for comparison.
+  #
+  # Raises NotImplementedError if neither +instructions+ is set nor +evaluate+ is overridden.
+  #
+  #: (input: String | Array[Hash[Symbol, untyped] | Riffer::Messages::Base], output: String, ?ground_truth: String?) -> Riffer::Evals::Result
+  def evaluate(input:, output:, ground_truth: nil)
+    instr = self.class.instructions
+    raise NotImplementedError, "#{self.class} must set instructions or implement #evaluate" unless instr
+
+    evaluation = judge.evaluate(
+      instructions: instr,
+      input: format_input(input),
+      output: output,
+      ground_truth: ground_truth
+    )
+
+    result(score: evaluation[:score], reason: evaluation[:reason])
+  end
+
+  private
+
+  # Formats the input for the judge.
+  #
+  # String inputs are passed through as-is.
+  # Array inputs (message hashes or Message objects) are formatted
+  # as labeled role/content pairs separated by blank lines.
+  #
+  #: (String | Array[Hash[Symbol, untyped] | Riffer::Messages::Base]) -> String
+  def format_input(input)
+    return input if input.is_a?(String)
+
+    input.map do |msg|
+      role = msg.is_a?(Hash) ? (msg[:role] || msg["role"]) : msg.role
+      content = msg.is_a?(Hash) ? (msg[:content] || msg["content"]) : msg.content
+      "#{role}: #{content}"
+    end.join("\n\n")
   end
 
   protected
