@@ -76,14 +76,18 @@ describe Riffer::Voice::Session do
   describe "lifecycle and input contracts" do
     let(:session) { Riffer::Voice.connect(model: "openai/gpt-realtime", system_prompt: "You are helpful") }
 
+    after do
+      session.close unless session.closed?
+    end
+
     it "accepts valid send calls while open" do
       expect(session.send_text_turn(text: "hello")).must_equal true
       expect(session.send_audio_chunk(payload: "BASE64", mime_type: "audio/pcm")).must_equal true
       expect(session.send_tool_response(call_id: "call_1", result: {ok: true})).must_equal true
     end
 
-    it "returns no events from skeleton next_event API" do
-      expect(session.next_event).must_be_nil
+    it "returns nil when no event arrives before timeout" do
+      expect(session.next_event(timeout: 0.01)).must_be_nil
       expect(session.next_event(timeout: 0)).must_be_nil
     end
 
@@ -91,7 +95,6 @@ describe Riffer::Voice::Session do
       events = session.events
 
       expect(events).must_be_instance_of Enumerator
-      expect(events.take(1)).must_equal []
     end
 
     it "raises on invalid send input" do

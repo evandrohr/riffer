@@ -3,8 +3,8 @@
 
 # Public voice session API.
 #
-# This phase intentionally provides lifecycle and input contracts only.
-# Runtime/provider wiring is added in later phases.
+# Provides lifecycle, input contracts, and event stream/poll APIs.
+# Runtime/provider transport wiring is added in later phases.
 class Riffer::Voice::Session
   # Voice model in provider/model format.
   attr_reader :model #: String
@@ -29,6 +29,7 @@ class Riffer::Voice::Session
     @config = config
     @runtime = runtime
     @runtime_executor = runtime_executor
+    @event_queue = Riffer::Voice::EventQueue.new(mode: queue_mode_for(runtime_executor))
     @connected = true
     @closed = false
   end
@@ -76,8 +77,13 @@ class Riffer::Voice::Session
   #: () -> Enumerator[Riffer::Voice::Events::Base, void]
   def events
     ensure_open!
-    Enumerator.new do |_yielder|
-      # Event streaming is added in Phase 3.
+    Enumerator.new do |yielder|
+      loop do
+        event = @event_queue.pop(timeout: nil)
+        break if event.nil?
+
+        yielder << event
+      end
     end
   end
 
@@ -87,19 +93,37 @@ class Riffer::Voice::Session
     invalid_timeout = !timeout.nil? && (!timeout.is_a?(Numeric) || timeout < 0)
     raise Riffer::ArgumentError, "timeout must be nil or >= 0" if invalid_timeout
 
-    nil
+    @event_queue.pop(timeout: timeout)
   end
 
   #: () -> void
   def close
     return if closed?
 
+    @event_queue.close
     @runtime_executor.shutdown
     @closed = true
     @connected = false
   end
 
   private
+
+  #: ((Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync)) -> Symbol
+  def queue_mode_for(runtime_executor)
+    if runtime_executor.kind == :async
+      :fiber
+    else
+      :thread
+    end
+  end
+
+  #: (Riffer::Voice::Events::Base) -> Riffer::Voice::Events::Base
+  def emit_event(event)
+    raise Riffer::ArgumentError, "event must be a voice event" unless event.is_a?(Riffer::Voice::Events::Base)
+
+    @event_queue.push(event)
+    event
+  end
 
   #: () -> void
   def ensure_open!
