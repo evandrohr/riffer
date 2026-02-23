@@ -48,6 +48,15 @@ class Riffer::Voice::Adapters::Base
     -> { driver_task }
   end
 
+  #: () -> ^(url: String, headers: Hash[String, String]) -> untyped
+  def runtime_transport_factory
+    if runtime_executor.respond_to?(:kind) && runtime_executor.kind == :background
+      ->(url:, headers:) { Riffer::Voice::Transports::ThreadWebsocket.connect(url: url, headers: headers) }
+    else
+      ->(url:, headers:) { Riffer::Voice::Transports::AsyncWebsocket.connect(url: url, headers: headers) }
+    end
+  end
+
   #: () -> untyped
   def driver_task
     if runtime_executor.respond_to?(:task)

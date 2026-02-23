@@ -3,11 +3,16 @@
 
 # Internal adapter for Gemini Live voice provider.
 class Riffer::Voice::Adapters::GeminiLive < Riffer::Voice::Adapters::Base
-  #: (model: String, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync), ?driver_factory: ^(model: String, task_resolver: ^() -> untyped, logger: untyped) -> untyped, ?logger: untyped) -> void
+  #: (model: String, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync), ?driver_factory: ^(model: String, task_resolver: ^() -> untyped, transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, logger: untyped) -> untyped, ?logger: untyped) -> void
   def initialize(model:, runtime_executor:, driver_factory: nil, logger: nil)
     super(model: model, runtime_executor: runtime_executor, logger: logger)
     @driver_factory = driver_factory || method(:build_driver).to_proc
-    @driver = @driver_factory.call(model: model, task_resolver: driver_task_resolver, logger: logger)
+    @driver = @driver_factory.call(
+      model: model,
+      task_resolver: driver_task_resolver,
+      transport_factory: runtime_transport_factory,
+      logger: logger
+    )
   end
 
   #: (system_prompt: String, on_event: ^(Riffer::Voice::Events::Base) -> void, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], ?config: Hash[Symbol | String, untyped]) -> bool
@@ -42,8 +47,13 @@ class Riffer::Voice::Adapters::GeminiLive < Riffer::Voice::Adapters::Base
 
   private
 
-  #: (model: String, task_resolver: ^() -> untyped, logger: untyped) -> Riffer::Voice::Drivers::GeminiLive
-  def build_driver(model:, task_resolver:, logger:)
-    Riffer::Voice::Drivers::GeminiLive.new(model: model, task_resolver: task_resolver, logger: logger)
+  #: (model: String, task_resolver: ^() -> untyped, transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, logger: untyped) -> Riffer::Voice::Drivers::GeminiLive
+  def build_driver(model:, task_resolver:, transport_factory:, logger:)
+    Riffer::Voice::Drivers::GeminiLive.new(
+      model: model,
+      task_resolver: task_resolver,
+      transport_factory: transport_factory,
+      logger: logger
+    )
   end
 end

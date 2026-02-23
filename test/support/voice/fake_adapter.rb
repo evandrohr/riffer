@@ -3,9 +3,11 @@
 module TestSupport
   module Voice
     class RuntimeDouble
+      attr_reader :kind
       attr_reader :scheduled_blocks
 
-      def initialize
+      def initialize(kind: :background)
+        @kind = kind
         @scheduled_blocks = []
       end
 
@@ -17,11 +19,12 @@ module TestSupport
     end
 
     class DriverDouble
-      attr_reader :model, :task_resolver, :logger, :connect_calls, :text_turns, :audio_chunks, :tool_responses, :closed
+      attr_reader :model, :task_resolver, :transport_factory, :logger, :connect_calls, :text_turns, :audio_chunks, :tool_responses, :closed
 
-      def initialize(model:, task_resolver:, logger:)
+      def initialize(model:, task_resolver:, logger:, transport_factory: nil)
         @model = model
         @task_resolver = task_resolver
+        @transport_factory = transport_factory
         @logger = logger
         @connect_calls = []
         @text_turns = []
