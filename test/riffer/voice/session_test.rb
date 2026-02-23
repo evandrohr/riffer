@@ -18,8 +18,32 @@ describe Riffer::Voice::Session do
       expect(session.system_prompt).must_equal "You are helpful"
       expect(session.config).must_equal({temperature: 0.2})
       expect(session.runtime).must_equal :auto
+      expect([:async, :background]).must_include session.runtime_kind
       expect(session).must_be :connected?
       expect(session).wont_be :closed?
+      session.close
+    end
+
+    it "supports explicit background runtime mode" do
+      session = Riffer::Voice.connect(
+        model: "openai/gpt-realtime",
+        system_prompt: "You are helpful",
+        runtime: :background
+      )
+
+      expect(session.runtime).must_equal :background
+      expect(session.runtime_kind).must_equal :background
+      session.close
+    end
+
+    it "requires async context for :async runtime mode" do
+      expect {
+        Riffer::Voice.connect(
+          model: "openai/gpt-realtime",
+          system_prompt: "You are helpful",
+          runtime: :async
+        )
+      }.must_raise Riffer::ArgumentError
     end
 
     it "validates model and system_prompt" do

@@ -21,15 +21,21 @@ class Riffer::Voice::Session
   # Runtime selection (:auto, :async, :background).
   attr_reader :runtime #: Symbol
 
-  #: (model: String, system_prompt: String, tools: Array[singleton(Riffer::Tool)], config: Hash[Symbol | String, untyped], runtime: Symbol) -> void
-  def initialize(model:, system_prompt:, tools:, config:, runtime:)
+  #: (model: String, system_prompt: String, tools: Array[singleton(Riffer::Tool)], config: Hash[Symbol | String, untyped], runtime: Symbol, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync)) -> void
+  def initialize(model:, system_prompt:, tools:, config:, runtime:, runtime_executor:)
     @model = model
     @system_prompt = system_prompt
     @tools = tools
     @config = config
     @runtime = runtime
+    @runtime_executor = runtime_executor
     @connected = true
     @closed = false
+  end
+
+  #: () -> Symbol
+  def runtime_kind
+    @runtime_executor.kind
   end
 
   #: () -> bool
@@ -88,6 +94,7 @@ class Riffer::Voice::Session
   def close
     return if closed?
 
+    @runtime_executor.shutdown
     @closed = true
     @connected = false
   end

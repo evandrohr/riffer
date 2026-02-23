@@ -12,20 +12,20 @@ Use this file at every pause point so work can resume without re-discovery.
 - Last updated: 2026-02-23
 - Current owner: Codex
 - Branch (current PR branch): `feature/voice-support`
-- HEAD commit: `84fa887`
-- Working tree state: dirty (`lib/riffer/voice.rb`, `lib/riffer/voice/session.rb`, `test/riffer/voice/session_test.rb`, `docs/13_VOICE_IMPLEMENTATION_FOLLOW_UP.md`)
+- HEAD commit: `200e5c1`
+- Working tree state: dirty (`lib/riffer/voice.rb`, `lib/riffer/voice/session.rb`, `lib/riffer/voice/runtime.rb`, `lib/riffer/voice/runtime/*`, `test/riffer/voice/session_test.rb`, `test/riffer/voice/runtime/*`, `docs/13_VOICE_IMPLEMENTATION_FOLLOW_UP.md`)
 
 ## Current Phase
-- Active phase: `Phase 1 - Session API Skeleton`
+- Active phase: `Phase 2 - Runtime Layer`
 - Phase status: `completed (awaiting review)`
-- Next phase: `Phase 2 - Runtime Layer`
+- Next phase: `Phase 3 - Event Queue + Stream API`
 
 ## Phase Status Board
 | Phase | Status | Started | Completed | Notes |
 | --- | --- | --- | --- | --- |
 | 0 Kickoff + Baseline | completed | 2026-02-23 | 2026-02-23 | branch/HEAD/worktree recorded; baseline voice tests pass |
 | 1 Session API Skeleton | completed | 2026-02-23 | 2026-02-23 | added `Riffer::Voice.connect` + `Session` lifecycle/input skeleton + tests |
-| 2 Runtime Layer | not_started | _TBD_ | _TBD_ | |
+| 2 Runtime Layer | completed | 2026-02-23 | 2026-02-23 | added runtime resolver and runtime strategies; wired `Voice.connect` runtime selection |
 | 3 Event Queue + Stream API | not_started | _TBD_ | _TBD_ | |
 | 4 Internal Provider Adapters | not_started | _TBD_ | _TBD_ | |
 | 5 Model Resolver + Validation | not_started | _TBD_ | _TBD_ | |
@@ -38,6 +38,7 @@ Use newest-first entries.
 
 | Date | Phase | Change | Files | Verification |
 | --- | --- | --- | --- | --- |
+| 2026-02-23 | 2 | Completed runtime layer with `:auto`, `:async`, `:background` strategy resolution and tests | `lib/riffer/voice/runtime.rb`, `lib/riffer/voice/runtime/resolver.rb`, `lib/riffer/voice/runtime/managed_async.rb`, `lib/riffer/voice/runtime/background_async.rb`, `lib/riffer/voice.rb`, `lib/riffer/voice/session.rb`, `test/riffer/voice/runtime/*`, `test/riffer/voice/session_test.rb` | full quality gate pass (`bundle exec rake`) |
 | 2026-02-23 | 1 | Completed Session API skeleton with lifecycle and validation contracts | `lib/riffer/voice.rb`, `lib/riffer/voice/session.rb`, `test/riffer/voice/session_test.rb` | voice suite pass (`965 runs, 0 failures`) |
 | 2026-02-23 | 0 | Completed Phase 0 baseline on current PR branch | `docs/13_VOICE_IMPLEMENTATION_FOLLOW_UP.md` | `feature/voice-support`, `539ac32`, clean worktree, voice tests pass |
 | 2026-02-23 | planning | Created phased implementation and tracker docs | `docs/12_VOICE_IMPLEMENTATION_PLAN.md`, `docs/13_VOICE_IMPLEMENTATION_FOLLOW_UP.md` | doc review |
@@ -69,6 +70,10 @@ Log important commands and outcomes.
 | 2026-02-23 | `export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; eval "$(rbenv init - zsh)"; bundle exec rake test TEST="test/riffer/voice/session_test.rb"` | phase-1 targeted verification | pass (`965 runs, 0 failures`) |
 | 2026-02-23 | `export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; eval "$(rbenv init - zsh)"; bundle exec rake test TEST="test/riffer/voice/**/*_test.rb"` | phase-1 full voice verification | pass (`965 runs, 0 failures`) |
 | 2026-02-23 | `export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; eval "$(rbenv init - zsh)"; RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake` | phase-1 full quality gate | pass (tests + standard + steep) |
+| 2026-02-23 | `export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; eval "$(rbenv init - zsh)"; bundle exec rake test TEST="test/riffer/voice/runtime/**/*_test.rb"` | phase-2 runtime verification | pass (`978 runs, 0 failures`) |
+| 2026-02-23 | `export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; eval "$(rbenv init - zsh)"; bundle exec rake test TEST="test/riffer/voice/session_test.rb"` | phase-2 session verification | pass (`978 runs, 0 failures`) |
+| 2026-02-23 | `export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; eval "$(rbenv init - zsh)"; bundle exec rake test TEST="test/riffer/voice/**/*_test.rb"` | phase-2 full voice verification | pass (`978 runs, 0 failures`) |
+| 2026-02-23 | `export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; eval "$(rbenv init - zsh)"; RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake` | phase-2 full quality gate | pass (tests + standard + steep) |
 
 ## Environment Assumptions
 - Development continues on the same PR branch: `feature/voice-support`.
@@ -81,8 +86,8 @@ Ordered, execution-ready tasks only.
 
 | Priority | Phase | Task | Owner | Status |
 | --- | --- | --- | --- | --- |
-| P0 | review | Review/approve Phase 1 completion | User | pending |
-| P1 | 2 | Implement runtime resolver + managed/background runtime modes | Codex | pending |
+| P0 | review | Review/approve Phase 2 completion | User | pending |
+| P1 | 3 | Implement event queue with `events` enumerator and `next_event` timeout integration | Codex | pending |
 
 ## Resume Checklist
 Perform these steps after any pause:

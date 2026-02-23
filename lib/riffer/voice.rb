@@ -10,12 +10,15 @@ module Riffer::Voice
   #: (model: String, system_prompt: String, ?tools: Array[singleton(Riffer::Tool)], ?config: Hash[Symbol | String, untyped], ?runtime: Symbol) -> Riffer::Voice::Session
   def self.connect(model:, system_prompt:, tools: [], config: {}, runtime: :auto)
     validate_connect_input!(model: model, system_prompt: system_prompt, tools: tools, config: config, runtime: runtime)
+    runtime_executor = Riffer::Voice::Runtime::Resolver.resolve(requested_mode: runtime)
+
     Riffer::Voice::Session.new(
       model: model,
       system_prompt: system_prompt,
       tools: tools,
       config: config,
-      runtime: runtime
+      runtime: runtime,
+      runtime_executor: runtime_executor
     )
   end
 
