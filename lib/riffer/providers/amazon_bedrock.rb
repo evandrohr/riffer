@@ -210,7 +210,9 @@ class Riffer::Providers::AmazonBedrock < Riffer::Providers::Base
       when Riffer::Messages::System
         system_prompts << {text: message.content}
       when Riffer::Messages::User
-        conversation_messages << {role: "user", content: [{text: message.content}]}
+        content = [{text: message.content}]
+        message.files.each { |file| content << convert_file_part_to_bedrock_format(file) }
+        conversation_messages << {role: "user", content: content}
       when Riffer::Messages::Assistant
         conversation_messages << convert_assistant_to_bedrock_format(message)
       when Riffer::Messages::Tool
@@ -257,6 +259,36 @@ class Riffer::Providers::AmazonBedrock < Riffer::Providers::Base
     else
       conversation_messages << {role: "user", content: [tool_result]}
     end
+  end
+
+  #: (Riffer::FilePart) -> Hash[Symbol, untyped]
+  def convert_file_part_to_bedrock_format(file)
+    raise Riffer::ArgumentError, "Amazon Bedrock does not support URL file sources; provide base64 data instead" if file.url? && file.data.nil?
+
+    format = bedrock_format(file.media_type)
+    bytes = Base64.decode64(file.data)
+
+    if file.image?
+      {image: {format: format, source: {bytes: bytes}}}
+    else
+      {document: {format: format, name: file.filename, source: {bytes: bytes}}}
+    end
+  end
+
+  BEDROCK_FORMAT_MAP = {
+    "image/jpeg" => "jpeg",
+    "image/png" => "png",
+    "image/gif" => "gif",
+    "image/webp" => "webp",
+    "application/pdf" => "pdf",
+    "text/plain" => "txt",
+    "text/csv" => "csv",
+    "text/html" => "html"
+  }.freeze #: Hash[String, String]
+
+  #: (String) -> String
+  def bedrock_format(media_type)
+    BEDROCK_FORMAT_MAP.fetch(media_type)
   end
 
   #: (singleton(Riffer::Tool)) -> Hash[Symbol, untyped]
