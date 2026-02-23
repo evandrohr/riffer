@@ -6,7 +6,6 @@
 # Voice support is additive and provider-neutral.
 module Riffer::Voice
   SUPPORTED_RUNTIMES = [:auto, :async, :background].freeze #: Array[Symbol]
-  SUPPORTED_ADAPTER_IDENTIFIERS = [:openai_realtime, :gemini_live].freeze #: Array[Symbol]
 
   #: (model: String, system_prompt: String, ?tools: Array[singleton(Riffer::Tool)], ?config: Hash[Symbol | String, untyped], ?runtime: Symbol, ?adapter_factory: ^(adapter_identifier: Symbol, model: String, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync)) -> untyped) -> Riffer::Voice::Session
   def self.connect(model:, system_prompt:, tools: [], config: {}, runtime: :auto, adapter_factory: nil)
@@ -19,23 +18,28 @@ module Riffer::Voice
       adapter_factory: adapter_factory
     )
     runtime_executor = Riffer::Voice::Runtime::Resolver.resolve(requested_mode: runtime)
-    adapter_identifier, adapter_model = resolve_adapter(model)
-    adapter = build_adapter(
-      adapter_identifier: adapter_identifier,
-      model: adapter_model,
-      runtime_executor: runtime_executor,
-      adapter_factory: adapter_factory
-    )
+    begin
+      resolved_model = Riffer::Voice::ModelResolver.resolve(model: model, validate_config: adapter_factory.nil?)
+      adapter = build_adapter(
+        adapter_identifier: resolved_model[:adapter_identifier],
+        model: resolved_model[:model],
+        runtime_executor: runtime_executor,
+        adapter_factory: adapter_factory
+      )
 
-    Riffer::Voice::Session.new(
-      model: model,
-      system_prompt: system_prompt,
-      tools: tools,
-      config: config,
-      runtime: runtime,
-      runtime_executor: runtime_executor,
-      adapter: adapter
-    )
+      Riffer::Voice::Session.new(
+        model: model,
+        system_prompt: system_prompt,
+        tools: tools,
+        config: config,
+        runtime: runtime,
+        runtime_executor: runtime_executor,
+        adapter: adapter
+      )
+    rescue
+      runtime_executor.shutdown if runtime_executor.respond_to?(:shutdown)
+      raise
+    end
   end
 
   #: (model: String, system_prompt: String, tools: Array[singleton(Riffer::Tool)], config: Hash[Symbol | String, untyped], runtime: Symbol, adapter_factory: untyped) -> void
@@ -50,19 +54,6 @@ module Riffer::Voice
   end
   private_class_method :validate_connect_input!
 
-  #: (String) -> [Symbol, String]
-  def self.resolve_adapter(model)
-    case model
-    when /\Aopenai\/(?<model_name>.+)\z/, /\Aopenai_realtime\/(?<model_name>.+)\z/
-      [:openai_realtime, Regexp.last_match[:model_name]]
-    when /\Agemini\/(?<model_name>.+)\z/, /\Agemini_live\/(?<model_name>.+)\z/
-      [:gemini_live, Regexp.last_match[:model_name]]
-    else
-      raise Riffer::ArgumentError, "voice model must include provider prefix (openai/ or gemini/)"
-    end
-  end
-  private_class_method :resolve_adapter
-
   #: (adapter_identifier: Symbol, model: String, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync), adapter_factory: untyped) -> untyped
   def self.build_adapter(adapter_identifier:, model:, runtime_executor:, adapter_factory:)
     if adapter_factory
@@ -74,7 +65,7 @@ module Riffer::Voice
     end
 
     adapter_class = Riffer::Voice::Adapters::Repository.find(adapter_identifier)
-    unless SUPPORTED_ADAPTER_IDENTIFIERS.include?(adapter_identifier) && adapter_class
+    unless adapter_class
       raise Riffer::ArgumentError, "unsupported voice adapter identifier: #{adapter_identifier}"
     end
 
