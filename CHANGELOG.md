@@ -7,11 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ⚠ BREAKING CHANGES
+
+* realtime voice now uses a single public session API (`Riffer::Voice.connect` + `Riffer::Voice::Session`); callback-first driver usage is removed from supported public docs
+* voice models must use `provider/model` format (`openai/...` or `gemini/...`); legacy prefixes such as `openai_realtime/*` and `gemini_live/*` are no longer supported
+* `Riffer::Voice::Events::ToolCall#arguments` is now always a hash; use `event.arguments_hash` for explicit access
+
 ### Features
 
-* add fiber-based realtime voice subsystem with Gemini Live and OpenAI Realtime GA drivers
-* add `Riffer::Voice` typed events, parser layer, and async websocket transport
-* add Gemini voice config namespace and realtime voice planning/follow-up docs
+* add runtime-flexible voice sessions with async/fiber and background/thread support
+* add internal provider adapter layer for OpenAI Realtime and Gemini Live voice transports
+* add strict voice model resolution and validation for `provider/model` identifiers
+* add normalized voice tool-call event contract across provider parsers
 
 
 ## [0.16.0](https://github.com/janeapp/riffer/compare/riffer/v0.15.1...riffer/v0.16.0) (2026-02-27)

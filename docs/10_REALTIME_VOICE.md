@@ -58,6 +58,55 @@ Legacy prefixes such as `openai_realtime/*` and `gemini_live/*` are not supporte
 4. `events` (Enumerator) and `next_event(timeout:)`
 5. `close`
 
+## Migration From Legacy Driver API
+
+If you were using direct driver classes and callbacks, migrate to sessions and event iteration.
+
+Before:
+
+```ruby
+driver = Riffer::Voice::Drivers::GeminiLive.new
+driver.connect(
+  system_prompt: "You are a concise voice assistant.",
+  callbacks: {
+    on_output_transcript: ->(event) { puts event.text }
+  }
+)
+driver.send_text_turn(text: "Hello")
+driver.close
+```
+
+After:
+
+```ruby
+session = Riffer::Voice.connect(
+  model: "gemini/gemini-2.5-flash-native-audio-preview-12-2025",
+  system_prompt: "You are a concise voice assistant."
+)
+
+begin
+  session.send_text_turn(text: "Hello")
+
+  session.events.each do |event|
+    case event
+    when Riffer::Voice::Events::OutputTranscript
+      puts event.text
+    when Riffer::Voice::Events::TurnComplete
+      break
+    end
+  end
+ensure
+  session.close
+end
+```
+
+Migration checklist:
+
+1. Replace driver construction with `Riffer::Voice.connect`.
+2. Replace callback handlers with `session.events` or `session.next_event(timeout:)`.
+3. Replace legacy voice model prefixes with `provider/model`.
+4. Use `event.arguments_hash` for tool calls.
+
 ## End-to-End Example
 
 ```ruby

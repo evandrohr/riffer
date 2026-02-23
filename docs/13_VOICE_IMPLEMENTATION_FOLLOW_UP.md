@@ -12,13 +12,13 @@ Use this file at every pause point so work can resume without re-discovery.
 - Last updated: 2026-02-23
 - Current owner: Codex
 - Branch (current PR branch): `feature/voice-support`
-- HEAD commit: `0d86e00`
-- Working tree state: dirty (`README.md`, `docs/01_OVERVIEW.md`, `docs/02_GETTING_STARTED.md`, `docs/07_CONFIGURATION.md`, `docs/10_REALTIME_VOICE.md`, `docs_providers/01_PROVIDERS.md`, `docs_providers/07_GEMINI_LIVE.md`, `docs_providers/08_OPENAI_REALTIME.md`, `docs/13_VOICE_IMPLEMENTATION_FOLLOW_UP.md`)
+- HEAD commit: `f9da486`
+- Working tree state: dirty (`CHANGELOG.md`, `docs/10_REALTIME_VOICE.md`, `docs/13_VOICE_IMPLEMENTATION_FOLLOW_UP.md`)
 
 ## Current Phase
-- Active phase: `Phase 7 - Public Surface Cutover`
+- Active phase: `Phase 8 - Hardening + Release Prep`
 - Phase status: `completed (awaiting review)`
-- Next phase: `Phase 8 - Hardening + Release Prep`
+- Next phase: `implementation complete`
 
 ## Phase Status Board
 | Phase | Status | Started | Completed | Notes |
@@ -31,13 +31,14 @@ Use this file at every pause point so work can resume without re-discovery.
 | 5 Model Resolver + Validation | completed | 2026-02-23 | 2026-02-23 | added strict model resolver (`provider/model`) and provider config validation for built-in adapters |
 | 6 Event Contract Normalization | completed | 2026-02-23 | 2026-02-23 | normalized `ToolCall` arguments to hash-only contract across event/parsers |
 | 7 Public Surface Cutover | completed | 2026-02-23 | 2026-02-23 | rewrote user-facing voice docs to session-first API and removed public driver/callback guidance |
-| 8 Hardening + Release Prep | not_started | _TBD_ | _TBD_ | |
+| 8 Hardening + Release Prep | completed | 2026-02-23 | 2026-02-23 | added breaking-change changelog + migration section and re-verified runtime compatibility gates |
 
 ## Completed Work Log
 Use newest-first entries.
 
 | Date | Phase | Change | Files | Verification |
 | --- | --- | --- | --- | --- |
+| 2026-02-23 | 8 | Completed hardening/release-prep artifacts with breaking-change changelog and migration notes; reran runtime compatibility checks and full quality gate | `CHANGELOG.md`, `docs/10_REALTIME_VOICE.md` | runtime checks + full quality gate pass (`bundle exec rake`) |
 | 2026-02-23 | 7 | Completed docs/public surface cutover to session-first voice API, removing public `Drivers` usage and callback-first examples | `README.md`, `docs/01_OVERVIEW.md`, `docs/02_GETTING_STARTED.md`, `docs/07_CONFIGURATION.md`, `docs/10_REALTIME_VOICE.md`, `docs_providers/01_PROVIDERS.md`, `docs_providers/07_GEMINI_LIVE.md`, `docs_providers/08_OPENAI_REALTIME.md` | full quality gate pass (`bundle exec rake`) |
 | 2026-02-23 | 6 | Completed tool-call event contract normalization (`Hash`-only arguments + `arguments_hash`) and parser normalization for malformed/non-object payloads | `lib/riffer/voice/events/tool_call.rb`, `lib/riffer/voice/parsers/openai_realtime_parser.rb`, `lib/riffer/voice/parsers/gemini_live_parser.rb`, `test/riffer/voice/events/event_objects_test.rb`, `test/riffer/voice/parsers/open_ai_realtime_parser_test.rb`, `test/riffer/voice/parsers/gemini_live_parser_test.rb` | full quality gate pass (`bundle exec rake`) |
 | 2026-02-23 | 5 | Completed strict voice model resolver and provider config validation; removed legacy model-prefix acceptance from connect path | `lib/riffer/voice/model_resolver.rb`, `lib/riffer/voice.rb`, `test/riffer/voice/model_resolver_test.rb`, `test/riffer/voice/connect_validation_test.rb` | full quality gate pass (`bundle exec rake`) |
@@ -59,6 +60,7 @@ Record architectural decisions that affect subsequent phases.
 | 2026-02-23 | Keep async/fiber and background/thread compatibility as a per-phase verification gate | user explicitly requested both modes remain supported through the refactor | every phase check now must include runtime-mode compatibility validation |
 | 2026-02-23 | Normalize voice tool-call arguments to hash-only contract | remove caller branching and align with RFC behavior (`arguments_hash` convenience) | parsers now coerce malformed/non-object argument payloads to `{}` |
 | 2026-02-23 | Public docs now treat `Riffer::Voice.connect` + `Session` as the only supported voice API | align DX with RFC and remove parallel public surfaces | provider driver constants remain internal implementation details |
+| 2026-02-23 | Add explicit migration guidance and changelog breaking-change callouts for voice cutover | reduce migration risk and align release artifacts with RFC acceptance criteria | users get concrete before/after migration path in voice docs and changelog |
 
 ## Blockers
 List active blockers only.
@@ -102,6 +104,9 @@ Log important commands and outcomes.
 | 2026-02-23 | `export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; eval "$(rbenv init - zsh)"; RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake` | phase-6 full quality gate | pass (tests + standard + steep) |
 | 2026-02-23 | `rg -n "Riffer::Voice::Drivers|callbacks:|on_tool_call|openai_realtime/|gemini_live/" README.md docs/01_OVERVIEW.md docs/02_GETTING_STARTED.md docs/07_CONFIGURATION.md docs/10_REALTIME_VOICE.md docs_providers/01_PROVIDERS.md docs_providers/07_GEMINI_LIVE.md docs_providers/08_OPENAI_REALTIME.md` | phase-7 docs stale-reference scan | pass (only explicit unsupported-legacy note in `docs/10_REALTIME_VOICE.md`) |
 | 2026-02-23 | `export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; eval "$(rbenv init - zsh)"; RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake` | phase-7 full quality gate | pass (tests + standard + steep) |
+| 2026-02-23 | `export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; eval "$(rbenv init - zsh)"; bundle exec rake test TEST="test/riffer/voice/runtime/**/*_test.rb"` | phase-8 runtime verification (async/fiber + background/thread coverage) | pass (`1014 runs, 0 failures`) |
+| 2026-02-23 | `export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; eval "$(rbenv init - zsh)"; bundle exec rake test TEST="test/riffer/voice/session_events_test.rb"` | phase-8 session event verification | pass (`1014 runs, 0 failures`) |
+| 2026-02-23 | `export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; eval "$(rbenv init - zsh)"; RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake` | phase-8 full quality gate | pass (tests + standard + steep) |
 
 ## Environment Assumptions
 - Development continues on the same PR branch: `feature/voice-support`.
@@ -114,8 +119,8 @@ Ordered, execution-ready tasks only.
 
 | Priority | Phase | Task | Owner | Status |
 | --- | --- | --- | --- | --- |
-| P0 | review | Review/approve Phase 7 completion | User | pending |
-| P1 | 8 | Run release hardening pass (full checks, changelog/migration notes, final docs consistency) | Codex | pending |
+| P0 | review | Review/approve Phase 8 completion | User | pending |
+| P1 | cleanup | Optionally remove planning/follow-up docs (`docs/11_*`, `docs/12_*`, `docs/13_*`) from PR per earlier agreement | Codex | pending |
 
 ## Resume Checklist
 Perform these steps after any pause:
