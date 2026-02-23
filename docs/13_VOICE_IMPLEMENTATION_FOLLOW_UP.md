@@ -10,20 +10,20 @@ Use this file at every pause point so work can resume without re-discovery.
 
 ## Session Metadata
 - Last updated: 2026-02-23
-- Current owner: _TBD_
-- Branch (current PR branch): _TBD_
-- HEAD commit: _TBD_
-- Working tree state: _TBD_
+- Current owner: Codex
+- Branch (current PR branch): `feature/voice-support`
+- HEAD commit: `539ac32`
+- Working tree state: dirty (`docs/13_VOICE_IMPLEMENTATION_FOLLOW_UP.md` updated for phase-0 checkpoint)
 
 ## Current Phase
 - Active phase: `Phase 0 - Kickoff + Baseline`
-- Phase status: `in_progress`
+- Phase status: `completed (awaiting review)`
 - Next phase: `Phase 1 - Session API Skeleton`
 
 ## Phase Status Board
 | Phase | Status | Started | Completed | Notes |
 | --- | --- | --- | --- | --- |
-| 0 Kickoff + Baseline | in_progress | 2026-02-23 | _TBD_ | tracker initialized |
+| 0 Kickoff + Baseline | completed | 2026-02-23 | 2026-02-23 | branch/HEAD/worktree recorded; baseline voice tests pass |
 | 1 Session API Skeleton | not_started | _TBD_ | _TBD_ | |
 | 2 Runtime Layer | not_started | _TBD_ | _TBD_ | |
 | 3 Event Queue + Stream API | not_started | _TBD_ | _TBD_ | |
@@ -38,6 +38,7 @@ Use newest-first entries.
 
 | Date | Phase | Change | Files | Verification |
 | --- | --- | --- | --- | --- |
+| 2026-02-23 | 0 | Completed Phase 0 baseline on current PR branch | `docs/13_VOICE_IMPLEMENTATION_FOLLOW_UP.md` | `feature/voice-support`, `539ac32`, clean worktree, voice tests pass |
 | 2026-02-23 | planning | Created phased implementation and tracker docs | `docs/12_VOICE_IMPLEMENTATION_PLAN.md`, `docs/13_VOICE_IMPLEMENTATION_FOLLOW_UP.md` | doc review |
 
 ## Decisions Log
@@ -62,14 +63,22 @@ Log important commands and outcomes.
 | --- | --- | --- | --- |
 | 2026-02-23 | `bundle exec rake test TEST='test/riffer/voice/**/*_test.rb'` | voice tests | failed under system ruby bundler mismatch |
 | 2026-02-23 | `export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; eval "$(rbenv init - zsh)"; bundle exec rake test TEST="test/riffer/voice/**/*_test.rb"` | voice tests | pass (`955 runs, 0 failures`) |
+| 2026-02-23 | `git branch --show-current && git rev-parse --short HEAD && git status --short` | phase-0 branch baseline | `feature/voice-support`, `539ac32`, clean |
+| 2026-02-23 | `export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; eval "$(rbenv init - zsh)"; bundle exec rake test TEST="test/riffer/voice/**/*_test.rb"` | phase-0 verification rerun | pass (`955 runs, 0 failures`) |
+
+## Environment Assumptions
+- Development continues on the same PR branch: `feature/voice-support`.
+- Ruby/bundler commands should run through rbenv shims.
+- Baseline voice suite is green before Phase 1 starts.
+- Working tree should remain clean at phase boundaries unless a phase explicitly introduces changes.
 
 ## Next Work Queue
 Ordered, execution-ready tasks only.
 
 | Priority | Phase | Task | Owner | Status |
 | --- | --- | --- | --- | --- |
-| P0 | 0 | Record current PR branch + HEAD + working tree state in this tracker | _TBD_ | pending |
-| P1 | 1 | Add `Riffer::Voice.connect` and `Session` skeleton + tests | _TBD_ | pending |
+| P0 | review | Review/approve Phase 0 completion | User | pending |
+| P1 | 1 | Add `Riffer::Voice.connect` and `Session` skeleton + tests | Codex | pending |
 
 ## Resume Checklist
 Perform these steps after any pause:
