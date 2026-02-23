@@ -43,8 +43,20 @@ describe "Riffer::Voice::Events" do
       call_id: "call_1",
       item_id: "item_1",
       name: "lookup",
-      arguments: {id: 1}
+      arguments: {"id" => 1}
     )
+  end
+
+  it "exposes arguments_hash as a hash with string keys" do
+    event = Riffer::Voice::Events::ToolCall.new(call_id: "call_1", name: "lookup", arguments: {id: 1})
+
+    expect(event.arguments_hash).must_equal({"id" => 1})
+  end
+
+  it "requires tool call arguments to be a hash" do
+    expect {
+      Riffer::Voice::Events::ToolCall.new(call_id: "call_1", name: "lookup", arguments: "{\"id\":1}")
+    }.must_raise Riffer::ArgumentError
   end
 
   it "serializes Interrupt" do

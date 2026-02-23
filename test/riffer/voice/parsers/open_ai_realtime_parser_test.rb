@@ -54,6 +54,37 @@ describe Riffer::Voice::Parsers::OpenAIRealtimeParser do
     event = events.first
     expect(event).must_be_instance_of Riffer::Voice::Events::ToolCall
     expect(event.arguments).must_equal({"id" => 1})
+    expect(event.arguments_hash).must_equal({"id" => 1})
+  end
+
+  it "normalizes invalid tool call argument payloads to empty hash" do
+    events = parser.call(
+      {
+        "type" => "response.function_call_arguments.done",
+        "call_id" => "call_1",
+        "name" => "lookup",
+        "arguments" => "not-json"
+      }
+    )
+
+    event = events.first
+    expect(event).must_be_instance_of Riffer::Voice::Events::ToolCall
+    expect(event.arguments).must_equal({})
+  end
+
+  it "normalizes non-object json tool call arguments to empty hash" do
+    events = parser.call(
+      {
+        "type" => "response.function_call_arguments.done",
+        "call_id" => "call_1",
+        "name" => "lookup",
+        "arguments" => "[1,2,3]"
+      }
+    )
+
+    event = events.first
+    expect(event).must_be_instance_of Riffer::Voice::Events::ToolCall
+    expect(event.arguments).must_equal({})
   end
 
   it "ignores function_call output items to avoid duplicate tool call events" do

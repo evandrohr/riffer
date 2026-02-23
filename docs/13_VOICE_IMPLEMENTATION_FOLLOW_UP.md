@@ -12,13 +12,13 @@ Use this file at every pause point so work can resume without re-discovery.
 - Last updated: 2026-02-23
 - Current owner: Codex
 - Branch (current PR branch): `feature/voice-support`
-- HEAD commit: `295efae`
-- Working tree state: dirty (`lib/riffer/voice.rb`, `lib/riffer/voice/model_resolver.rb`, `test/riffer/voice/model_resolver_test.rb`, `test/riffer/voice/connect_validation_test.rb`, `docs/13_VOICE_IMPLEMENTATION_FOLLOW_UP.md`)
+- HEAD commit: `30ddcfa`
+- Working tree state: dirty (`lib/riffer/voice/events/tool_call.rb`, `lib/riffer/voice/parsers/openai_realtime_parser.rb`, `lib/riffer/voice/parsers/gemini_live_parser.rb`, `test/riffer/voice/events/event_objects_test.rb`, `test/riffer/voice/parsers/open_ai_realtime_parser_test.rb`, `test/riffer/voice/parsers/gemini_live_parser_test.rb`, `docs/13_VOICE_IMPLEMENTATION_FOLLOW_UP.md`)
 
 ## Current Phase
-- Active phase: `Phase 5 - Model Resolver + Validation`
+- Active phase: `Phase 6 - Event Contract Normalization`
 - Phase status: `completed (awaiting review)`
-- Next phase: `Phase 6 - Event Contract Normalization`
+- Next phase: `Phase 7 - Public Surface Cutover`
 
 ## Phase Status Board
 | Phase | Status | Started | Completed | Notes |
@@ -29,7 +29,7 @@ Use this file at every pause point so work can resume without re-discovery.
 | 3 Event Queue + Stream API | completed | 2026-02-23 | 2026-02-23 | added queue integration with fiber mode for `:async` and thread mode for `:background` |
 | 4 Internal Provider Adapters | completed | 2026-02-23 | 2026-02-23 | added internal adapter wrappers (OpenAI/Gemini) and wired session send/connect/close routing |
 | 5 Model Resolver + Validation | completed | 2026-02-23 | 2026-02-23 | added strict model resolver (`provider/model`) and provider config validation for built-in adapters |
-| 6 Event Contract Normalization | not_started | _TBD_ | _TBD_ | |
+| 6 Event Contract Normalization | completed | 2026-02-23 | 2026-02-23 | normalized `ToolCall` arguments to hash-only contract across event/parsers |
 | 7 Public Surface Cutover | not_started | _TBD_ | _TBD_ | |
 | 8 Hardening + Release Prep | not_started | _TBD_ | _TBD_ | |
 
@@ -38,6 +38,7 @@ Use newest-first entries.
 
 | Date | Phase | Change | Files | Verification |
 | --- | --- | --- | --- | --- |
+| 2026-02-23 | 6 | Completed tool-call event contract normalization (`Hash`-only arguments + `arguments_hash`) and parser normalization for malformed/non-object payloads | `lib/riffer/voice/events/tool_call.rb`, `lib/riffer/voice/parsers/openai_realtime_parser.rb`, `lib/riffer/voice/parsers/gemini_live_parser.rb`, `test/riffer/voice/events/event_objects_test.rb`, `test/riffer/voice/parsers/open_ai_realtime_parser_test.rb`, `test/riffer/voice/parsers/gemini_live_parser_test.rb` | full quality gate pass (`bundle exec rake`) |
 | 2026-02-23 | 5 | Completed strict voice model resolver and provider config validation; removed legacy model-prefix acceptance from connect path | `lib/riffer/voice/model_resolver.rb`, `lib/riffer/voice.rb`, `test/riffer/voice/model_resolver_test.rb`, `test/riffer/voice/connect_validation_test.rb` | full quality gate pass (`bundle exec rake`) |
 | 2026-02-23 | 4 | Completed internal provider adapter layer and integrated session/runtime wiring with adapter routing and tests | `lib/riffer/voice.rb`, `lib/riffer/voice/session.rb`, `lib/riffer/voice/adapters/*`, `test/riffer/voice/session_test.rb`, `test/riffer/voice/session_events_test.rb`, `test/riffer/voice/adapters/*`, `test/support/voice/fake_adapter.rb` | full quality gate pass (`bundle exec rake`) |
 | 2026-02-23 | 3 | Completed event queue and session stream/poll integration with fiber-aware async path and thread-backed background path | `lib/riffer/voice/event_queue.rb`, `lib/riffer/voice/session.rb`, `test/riffer/voice/event_queue_test.rb`, `test/riffer/voice/session_events_test.rb`, `test/riffer/voice/session_test.rb` | full quality gate pass (`bundle exec rake`) |
@@ -55,6 +56,7 @@ Record architectural decisions that affect subsequent phases.
 | 2026-02-23 | Keep implementation on the same PR branch | user requested final result in the same PR | Phase 0 branch-creation step removed |
 | 2026-02-23 | Keep existing driver/parser code and add internal adapter wrappers | minimizes risk while moving public DX to `Session` + runtime-managed adapter integration | Phase 4 can land without changing provider-specific parsing behavior |
 | 2026-02-23 | Keep async/fiber and background/thread compatibility as a per-phase verification gate | user explicitly requested both modes remain supported through the refactor | every phase check now must include runtime-mode compatibility validation |
+| 2026-02-23 | Normalize voice tool-call arguments to hash-only contract | remove caller branching and align with RFC behavior (`arguments_hash` convenience) | parsers now coerce malformed/non-object argument payloads to `{}` |
 
 ## Blockers
 List active blockers only.
@@ -94,6 +96,8 @@ Log important commands and outcomes.
 | 2026-02-23 | `export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; eval "$(rbenv init - zsh)"; RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake` | phase-4 full quality gate (after fix) | pass (tests + standard + steep) |
 | 2026-02-23 | `export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; eval "$(rbenv init - zsh)"; bundle exec rake test TEST="test/riffer/voice/**/*_test.rb"` | phase-5 full voice verification | pass (`1008 runs, 0 failures`) |
 | 2026-02-23 | `export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; eval "$(rbenv init - zsh)"; RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake` | phase-5 full quality gate | pass (tests + standard + steep) |
+| 2026-02-23 | `export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; eval "$(rbenv init - zsh)"; bundle exec rake test TEST="test/riffer/voice/**/*_test.rb"` | phase-6 full voice verification | pass (`1014 runs, 0 failures`) |
+| 2026-02-23 | `export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"; eval "$(rbenv init - zsh)"; RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake` | phase-6 full quality gate | pass (tests + standard + steep) |
 
 ## Environment Assumptions
 - Development continues on the same PR branch: `feature/voice-support`.
@@ -106,8 +110,8 @@ Ordered, execution-ready tasks only.
 
 | Priority | Phase | Task | Owner | Status |
 | --- | --- | --- | --- | --- |
-| P0 | review | Review/approve Phase 5 completion | User | pending |
-| P1 | 6 | Normalize tool-call event contract to hash-only arguments | Codex | pending |
+| P0 | review | Review/approve Phase 6 completion | User | pending |
+| P1 | 7 | Cut over public docs/surface to session-first API and remove legacy voice references | Codex | pending |
 
 ## Resume Checklist
 Perform these steps after any pause:

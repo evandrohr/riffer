@@ -260,14 +260,17 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
     [Riffer::Voice::Events::Interrupt.new(reason: type)]
   end
 
-  #: (untyped) -> (String | Hash[Symbol | String, untyped])
+  #: (untyped) -> Hash[String, untyped]
   def parse_arguments(arguments)
     return {} if arguments.nil?
-    return arguments if arguments.is_a?(Hash)
+    return deep_stringify(arguments) if arguments.is_a?(Hash)
 
-    JSON.parse(arguments)
+    parsed = JSON.parse(arguments)
+    return deep_stringify(parsed) if parsed.is_a?(Hash)
+
+    {}
   rescue JSON::ParserError
-    arguments.to_s
+    {}
   end
 
   #: (String) -> bool

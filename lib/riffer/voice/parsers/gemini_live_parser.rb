@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 # rbs_inline: enabled
 
+require "json"
+
 # Parses Gemini Live realtime payloads into normalized voice events.
 class Riffer::Voice::Parsers::GeminiLiveParser < Riffer::Voice::Parsers::Base
   KEYS_SERVER_CONTENT = ["serverContent", "server_content"].freeze #: Array[String]
@@ -127,7 +129,7 @@ class Riffer::Voice::Parsers::GeminiLiveParser < Riffer::Voice::Parsers::Base
 
       call_id = fetch_any(call, KEYS_CALL_ID)
       name = fetch_any(call, KEYS_NAME)
-      arguments = fetch_any(call, KEYS_ARGS) || {}
+      arguments = parse_arguments(fetch_any(call, KEYS_ARGS))
       next if call_id.nil? || name.nil?
 
       item_id = fetch_any(call, KEYS_ITEM_ID)
@@ -138,6 +140,19 @@ class Riffer::Voice::Parsers::GeminiLiveParser < Riffer::Voice::Parsers::Base
         item_id: item_id&.to_s
       )
     end
+  end
+
+  #: (untyped) -> Hash[String, untyped]
+  def parse_arguments(arguments)
+    return {} if arguments.nil?
+    return deep_stringify(arguments) if arguments.is_a?(Hash)
+
+    parsed = JSON.parse(arguments.to_s)
+    return deep_stringify(parsed) if parsed.is_a?(Hash)
+
+    {}
+  rescue JSON::ParserError
+    {}
   end
 
   #: (Hash[String, untyped], Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]

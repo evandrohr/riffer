@@ -71,4 +71,40 @@ describe Riffer::Voice::Parsers::GeminiLiveParser do
   it "returns empty array for unsupported payload" do
     expect(parser.call({"foo" => "bar"})).must_equal []
   end
+
+  it "normalizes string tool call args into hash" do
+    payload = {
+      "toolCall" => {
+        "functionCalls" => [
+          {
+            "id" => "call_123",
+            "name" => "lookup_patient",
+            "args" => "{\"phone\":\"111\"}"
+          }
+        ]
+      }
+    }
+
+    events = parser.call(payload)
+    expect(events.map(&:class)).must_equal([Riffer::Voice::Events::ToolCall])
+    expect(events.first.arguments).must_equal({"phone" => "111"})
+  end
+
+  it "normalizes invalid string tool call args to empty hash" do
+    payload = {
+      "toolCall" => {
+        "functionCalls" => [
+          {
+            "id" => "call_123",
+            "name" => "lookup_patient",
+            "args" => "not-json"
+          }
+        ]
+      }
+    }
+
+    events = parser.call(payload)
+    expect(events.map(&:class)).must_equal([Riffer::Voice::Events::ToolCall])
+    expect(events.first.arguments).must_equal({})
+  end
 end

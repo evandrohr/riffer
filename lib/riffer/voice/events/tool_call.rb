@@ -10,18 +10,25 @@ class Riffer::Voice::Events::ToolCall < Riffer::Voice::Events::Base
   attr_reader :name #: String
 
   # Tool call arguments.
-  attr_reader :arguments #: (String | Hash[Symbol | String, untyped])
+  attr_reader :arguments #: Hash[String, untyped]
 
   # Provider item identifier when available.
   attr_reader :item_id #: String?
 
-  #: (call_id: String, name: String, arguments: (String | Hash[Symbol | String, untyped]), ?item_id: String?, ?role: Symbol) -> void
+  #: (call_id: String, name: String, arguments: Hash[String | Symbol, untyped], ?item_id: String?, ?role: Symbol) -> void
   def initialize(call_id:, name:, arguments:, item_id: nil, role: :assistant)
     super(role: role)
+    raise Riffer::ArgumentError, "arguments must be a Hash" unless arguments.is_a?(Hash)
+
     @call_id = call_id
     @name = name
-    @arguments = arguments
+    @arguments = deep_stringify(arguments)
     @item_id = item_id
+  end
+
+  #: () -> Hash[String, untyped]
+  def arguments_hash
+    @arguments
   end
 
   #: () -> Hash[Symbol, untyped]
@@ -34,5 +41,21 @@ class Riffer::Voice::Events::ToolCall < Riffer::Voice::Events::Base
     }
     hash[:item_id] = @item_id if @item_id
     hash
+  end
+
+  private
+
+  #: (untyped) -> untyped
+  def deep_stringify(value)
+    case value
+    when Hash
+      value.each_with_object({}) do |(key, nested), result|
+        result[key.to_s] = deep_stringify(nested)
+      end
+    when Array
+      value.map { |nested| deep_stringify(nested) }
+    else
+      value
+    end
   end
 end
