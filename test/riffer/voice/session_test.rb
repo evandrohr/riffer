@@ -180,5 +180,135 @@ describe Riffer::Voice::Session do
       expect { session.events }.must_raise Riffer::Error
       expect { session.next_event }.must_raise Riffer::Error
     end
+
+    it "reports only missing adapter methods in contract validation errors" do
+      partial_adapter = Class.new do
+        def connect(system_prompt:, tools:, config:, on_event:)
+          true
+        end
+
+        def connected?
+          true
+        end
+
+        def close
+          true
+        end
+      end.new
+
+      runtime_executor = Struct.new(:kind) do
+        def shutdown
+          true
+        end
+      end.new(:background)
+
+      error = expect {
+        Riffer::Voice::Session.new(
+          model: "openai/gpt-realtime",
+          system_prompt: "You are helpful",
+          tools: [],
+          config: {},
+          runtime: :background,
+          runtime_executor: runtime_executor,
+          adapter: partial_adapter
+        )
+      }.must_raise Riffer::ArgumentError
+
+      expect(error.message).must_include "send_text_turn"
+      expect(error.message).must_include "send_audio_chunk"
+      expect(error.message).must_include "send_tool_response"
+      expect(error.message).wont_include "connect"
+      expect(error.message).wont_include "connected?"
+      expect(error.message).wont_include "close"
+    end
+
+    it "serializes close and send_text_turn in background thread usage" do
+      blocking_adapter = Class.new do
+        attr_reader :send_calls, :close_calls
+
+        def initialize
+          @connected = false
+          @send_calls = []
+          @close_calls = 0
+          @send_started = Queue.new
+          @send_release = Queue.new
+        end
+
+        def connect(system_prompt:, tools:, config:, on_event:)
+          @connected = true
+          true
+        end
+
+        def connected?
+          @connected == true
+        end
+
+        def send_text_turn(text:)
+          @send_started << true
+          @send_release.pop
+          @send_calls << text
+          true
+        end
+
+        def send_audio_chunk(payload:, mime_type:)
+          true
+        end
+
+        def send_tool_response(call_id:, result:)
+          true
+        end
+
+        def close
+          @close_calls += 1
+          @connected = false
+          true
+        end
+
+        def wait_for_send_start
+          @send_started.pop
+        end
+
+        def release_send
+          @send_release << true
+        end
+      end.new
+
+      runtime_executor = Struct.new(:kind) do
+        def shutdown
+          true
+        end
+      end.new(:background)
+
+      session = Riffer::Voice::Session.new(
+        model: "openai/gpt-realtime",
+        system_prompt: "You are helpful",
+        tools: [],
+        config: {},
+        runtime: :background,
+        runtime_executor: runtime_executor,
+        adapter: blocking_adapter
+      )
+
+      send_thread = Thread.new { session.send_text_turn(text: "hello") }
+      blocking_adapter.wait_for_send_start
+
+      close_finished = Queue.new
+      close_thread = Thread.new do
+        session.close
+        close_finished << true
+      end
+
+      sleep 0.01
+      expect(close_finished.empty?).must_equal true
+
+      blocking_adapter.release_send
+      send_thread.join
+      close_thread.join
+
+      expect(close_finished.pop).must_equal true
+      expect(blocking_adapter.send_calls).must_equal ["hello"]
+      expect(blocking_adapter.close_calls).must_equal 1
+      expect(session.closed?).must_equal true
+    end
   end
 end

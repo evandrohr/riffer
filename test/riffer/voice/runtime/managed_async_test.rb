@@ -30,9 +30,13 @@ describe Riffer::Voice::Runtime::ManagedAsync do
 
   it "falls back to inline execution when task lacks async" do
     runtime = Riffer::Voice::Runtime::ManagedAsync.new(task: Object.new)
-    result = runtime.schedule { :ok }
+    result = nil
+    _output, error_output = capture_io do
+      result = runtime.schedule { :ok }
+    end
 
     expect(result).must_equal :ok
+    expect(error_output).must_include "managed async runtime task does not implement :async"
   end
 
   it "requires a block for schedule" do

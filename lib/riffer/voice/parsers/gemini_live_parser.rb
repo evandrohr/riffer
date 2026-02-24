@@ -54,15 +54,23 @@ class Riffer::Voice::Parsers::GeminiLiveParser < Riffer::Voice::Parsers::Base
   #: (Hash[String, untyped], Hash[String, untyped]?) -> bool
   def audio_only_frame?(data, server_content)
     return false unless server_content.is_a?(Hash)
-    return false unless server_content.key?("modelTurn") || server_content.key?("model_turn")
-    return false if server_content.key?("inputTranscription") || server_content.key?("input_transcription")
-    return false if server_content.key?("outputTranscription") || server_content.key?("output_transcription")
-    return false if server_content.key?("interrupted")
-    return false if server_content.key?("turnComplete") || server_content.key?("turn_complete")
+    return false if true_any?(server_content, KEYS_TURN_COMPLETE)
+    return false if data["interrupted"] == true || server_content["interrupted"] == true
     return false if data.key?("toolCall") || data.key?("tool_call")
     return false if data.key?("usageMetadata") || data.key?("usage_metadata") || data.key?("usage")
 
-    true
+    model_turn = fetch_any(server_content, KEYS_MODEL_TURN)
+    return false unless model_turn.is_a?(Hash)
+
+    parts = Array(model_turn["parts"])
+    return false if parts.empty?
+
+    parts.all? do |part|
+      next false unless part.is_a?(Hash)
+
+      inline_data = fetch_any(part, KEYS_INLINE_DATA)
+      inline_data.is_a?(Hash) && !inline_data["data"].to_s.empty?
+    end
   end
 
   #: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
@@ -207,7 +215,7 @@ class Riffer::Voice::Parsers::GeminiLiveParser < Riffer::Voice::Parsers::Base
     return nil if value.nil?
 
     Integer(value)
-  rescue
+  rescue TypeError, ArgumentError
     nil
   end
 end

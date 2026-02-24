@@ -31,6 +31,7 @@ class Riffer::Voice::Session
     @runtime_executor = runtime_executor
     @adapter = adapter
     @event_queue = Riffer::Voice::EventQueue.new(mode: queue_mode_for(runtime_executor))
+    @state_lock = state_lock_for(runtime_executor)
     @connected = false
     @closed = false
     connect_adapter!
@@ -43,44 +44,40 @@ class Riffer::Voice::Session
 
   #: () -> bool
   def connected?
-    return false unless @connected == true
+    @state_lock.synchronize do
+      return false unless @connected == true
 
-    @adapter.connected? == true
-  rescue
-    false
+      @adapter.connected? == true
+    rescue
+      false
+    end
   end
 
   #: () -> bool
   def closed?
-    @closed == true
+    @state_lock.synchronize { @closed == true }
   end
 
   #: (text: String) -> bool
   def send_text_turn(text:)
-    ensure_open!
     raise Riffer::ArgumentError, "text must be a non-empty String" unless text.is_a?(String) && !text.empty?
-
-    @adapter.send_text_turn(text: text)
+    with_open_adapter { |adapter| adapter.send_text_turn(text: text) }
     true
   end
 
   #: (payload: String, mime_type: String) -> bool
   def send_audio_chunk(payload:, mime_type:)
-    ensure_open!
     raise Riffer::ArgumentError, "payload must be a non-empty String" unless payload.is_a?(String) && !payload.empty?
     raise Riffer::ArgumentError, "mime_type must be a non-empty String" unless mime_type.is_a?(String) && !mime_type.empty?
-
-    @adapter.send_audio_chunk(payload: payload, mime_type: mime_type)
+    with_open_adapter { |adapter| adapter.send_audio_chunk(payload: payload, mime_type: mime_type) }
     true
   end
 
   #: (call_id: String, result: untyped) -> bool
   def send_tool_response(call_id:, result:)
-    ensure_open!
     raise Riffer::ArgumentError, "call_id must be a non-empty String" unless call_id.is_a?(String) && !call_id.empty?
     raise Riffer::ArgumentError, "result must not be nil" if result.nil?
-
-    @adapter.send_tool_response(call_id: call_id, result: result)
+    with_open_adapter { |adapter| adapter.send_tool_response(call_id: call_id, result: result) }
     true
   end
 
@@ -108,15 +105,17 @@ class Riffer::Voice::Session
 
   #: () -> void
   def close
-    return if closed?
+    @state_lock.synchronize do
+      return if @closed == true
 
-    @event_queue.close
-    begin
-      @adapter.close
-    ensure
-      @runtime_executor.shutdown
-      @closed = true
-      @connected = false
+      @event_queue.close
+      begin
+        @adapter.close
+      ensure
+        @runtime_executor.shutdown
+        @closed = true
+        @connected = false
+      end
     end
   end
 
@@ -127,7 +126,7 @@ class Riffer::Voice::Session
     required_methods = [:connect, :connected?, :send_text_turn, :send_audio_chunk, :send_tool_response, :close]
     missing_methods = required_methods.reject { |method_name| @adapter.respond_to?(method_name) }
     unless missing_methods.empty?
-      raise Riffer::ArgumentError, "adapter must respond to: #{required_methods.join(", ")}"
+      raise Riffer::ArgumentError, "adapter must respond to: #{missing_methods.join(", ")}"
     end
 
     connected = @adapter.connect(
@@ -138,7 +137,7 @@ class Riffer::Voice::Session
     )
     raise Riffer::Error, "Voice adapter failed to connect" unless connected
 
-    @connected = true
+    @state_lock.synchronize { @connected = true }
   rescue
     @event_queue.close
     begin
@@ -147,8 +146,10 @@ class Riffer::Voice::Session
       Warning.warn("[riffer] adapter close failed during session cleanup: #{error.class}: #{error.message}\n")
     end
     @runtime_executor.shutdown
-    @closed = true
-    @connected = false
+    @state_lock.synchronize do
+      @closed = true
+      @connected = false
+    end
     raise
   end
 
@@ -158,6 +159,15 @@ class Riffer::Voice::Session
       :fiber
     else
       :thread
+    end
+  end
+
+  #: ((Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync)) -> untyped
+  def state_lock_for(runtime_executor)
+    if runtime_executor.respond_to?(:kind) && runtime_executor.kind == :background
+      Mutex.new
+    else
+      NoopStateLock.new
     end
   end
 
@@ -172,7 +182,36 @@ class Riffer::Voice::Session
 
   #: () -> void
   def ensure_open!
-    raise Riffer::Error, "Voice session is closed" if closed?
-    raise Riffer::Error, "Voice session is not connected" unless connected?
+    @state_lock.synchronize do
+      ensure_open_unlocked!
+    end
+  end
+
+  #: () { (untyped) -> void } -> void
+  def with_open_adapter
+    @state_lock.synchronize do
+      ensure_open_unlocked!
+      yield @adapter
+    end
+  end
+
+  #: () -> void
+  def ensure_open_unlocked!
+    raise Riffer::Error, "Voice session is closed" if @closed == true
+
+    connected = begin
+      @connected == true && @adapter.connected? == true
+    rescue
+      false
+    end
+    raise Riffer::Error, "Voice session is not connected" unless connected
+  end
+
+  # Lock shim for async/fiber runtime where operations share a single thread.
+  class NoopStateLock
+    #: () { () -> untyped } -> untyped
+    def synchronize
+      yield
+    end
   end
 end

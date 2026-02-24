@@ -297,4 +297,21 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
     expect(driver).wont_be :connected?
     expect(transport).must_be :closed?
   end
+
+  it "bounds sample rate cache growth for varied mime types" do
+    driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
+      api_key: "openai-key",
+      model: "gpt-realtime",
+      transport_factory: ->(url:, headers:) { VoiceDriverTestHelpers::FakeTransport.new },
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    50.times do |index|
+      driver.send(:extract_sample_rate, "audio/pcm;rate=#{16_000 + index}")
+    end
+
+    sample_rate_cache = driver.instance_variable_get(:@sample_rate_cache)
+    expect(sample_rate_cache.size).must_be :<=, Riffer::Voice::Drivers::OpenAIRealtime::SAMPLE_RATE_CACHE_LIMIT
+  end
 end

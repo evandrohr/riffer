@@ -270,7 +270,10 @@ class Riffer::Voice::Drivers::GeminiLive < Riffer::Voice::Drivers::Base
   #: () -> void
   def read_loop
     while connected?
-      frame = @transport&.read
+      transport = @transport
+      break if transport.nil?
+
+      frame = transport.read
       break if frame.nil?
 
       payload = parse_frame_payload(frame)

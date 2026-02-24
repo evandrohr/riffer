@@ -292,7 +292,7 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
     return nil if value.nil?
 
     Integer(value)
-  rescue
+  rescue TypeError, ArgumentError
     nil
   end
 end

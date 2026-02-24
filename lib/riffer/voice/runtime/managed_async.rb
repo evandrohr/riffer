@@ -33,6 +33,7 @@ class Riffer::Voice::Runtime::ManagedAsync
     if @task.respond_to?(:async)
       @task.async(annotation: "riffer-voice-runtime", &block)
     else
+      Warning.warn("[riffer] managed async runtime task does not implement :async; executing inline\n")
       block.call
     end
   end

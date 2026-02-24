@@ -112,4 +112,17 @@ describe Riffer::Voice::Parsers::GeminiLiveParser do
     expect(error_output).must_include "normalized invalid tool arguments"
     expect(error_output).must_include "json parse failed"
   end
+
+  it "treats modelTurn text-only frames as non-audio-only" do
+    data = {}
+    server_content = {
+      "modelTurn" => {
+        "parts" => [
+          {"text" => "hello"}
+        ]
+      }
+    }
+
+    expect(parser.send(:audio_only_frame?, data, server_content)).must_equal false
+  end
 end

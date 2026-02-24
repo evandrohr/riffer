@@ -16,6 +16,7 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
   DEFAULT_AUDIO_MIME_TYPE = "audio/pcm" #: String
 
   DEFAULT_AUDIO_SAMPLE_RATE = 24_000 #: Integer
+  SAMPLE_RATE_CACHE_LIMIT = 32 #: Integer
 
   DEFAULT_OUTPUT_VOICE = "alloy" #: String
 
@@ -286,7 +287,10 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
   #: () -> void
   def read_loop
     while connected?
-      frame = @transport&.read
+      transport = @transport
+      break if transport.nil?
+
+      frame = transport.read
       break if frame.nil?
 
       payload = parse_frame_payload(frame)
@@ -522,6 +526,7 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
       value.positive? ? value : nil
     end
 
+    @sample_rate_cache.shift if @sample_rate_cache.size >= SAMPLE_RATE_CACHE_LIMIT
     @sample_rate_cache[mime_type] = rate
   end
 

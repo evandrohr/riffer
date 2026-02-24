@@ -37,7 +37,11 @@ module Riffer::Voice
         adapter: adapter
       )
     rescue
-      runtime_executor.shutdown if runtime_executor.respond_to?(:shutdown)
+      begin
+        runtime_executor.shutdown if runtime_executor.respond_to?(:shutdown)
+      rescue => error
+        Warning.warn("[riffer] runtime shutdown failed during voice.connect cleanup: #{error.class}: #{error.message}\n")
+      end
       raise
     end
   end

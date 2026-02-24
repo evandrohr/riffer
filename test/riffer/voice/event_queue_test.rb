@@ -57,4 +57,14 @@ describe Riffer::Voice::EventQueue do
     expect(fiber_queue.push(event)).must_equal true
     expect(fiber_queue.pop(timeout: 0)).must_equal event
   end
+
+  it "validates fiber_poll_interval is greater than zero" do
+    expect {
+      Riffer::Voice::EventQueue.new(mode: :fiber, fiber_poll_interval: 0)
+    }.must_raise Riffer::ArgumentError
+
+    expect {
+      Riffer::Voice::EventQueue.new(mode: :fiber, fiber_poll_interval: -0.01)
+    }.must_raise Riffer::ArgumentError
+  end
 end

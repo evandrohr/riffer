@@ -7,6 +7,9 @@ class Riffer::Voice::EventQueue
 
   #: (?mode: Symbol, ?fiber_poll_interval: Numeric) -> void
   def initialize(mode: :thread, fiber_poll_interval: DEFAULT_FIBER_POLL_INTERVAL)
+    invalid_poll_interval = !fiber_poll_interval.is_a?(Numeric) || fiber_poll_interval <= 0
+    raise Riffer::ArgumentError, "fiber_poll_interval must be > 0" if invalid_poll_interval
+
     @mode = mode
     @fiber_poll_interval = fiber_poll_interval
     @events = [] #: Array[Riffer::Voice::Events::Base]
