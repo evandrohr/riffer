@@ -26,11 +26,10 @@ module Riffer::Helpers::Dependencies
     return true unless defined?(Bundler)
 
     gem_version = Gem.loaded_specs[gem_name].version
-    gem_dependency = Bundler.load.dependencies.find { |g| g.name == gem_name }
-    gem_requirement = gem_dependency&.requirement
-
+    gem_requirement = dependency_requirement(gem_name)
     unless gem_requirement
-      raise VersionError, "The #{gem_name} gem is installed but not specified in your Bundler dependencies (e.g., Gemfile)."
+      raise VersionError,
+        "The #{gem_name} gem is installed but not specified in your Bundler dependencies (Gemfile or Gemfile.lock)."
     end
 
     unless gem_requirement.satisfied_by?(gem_version)
@@ -45,5 +44,20 @@ module Riffer::Helpers::Dependencies
     true
   rescue ::LoadError
     raise LoadError, "Could not load #{gem_name}. Please ensure that the #{gem_name} gem is installed."
+  end
+
+  private
+
+  #: (String) -> Gem::Requirement?
+  def dependency_requirement(gem_name)
+    direct_dependency = Bundler.load.dependencies.find { |dependency| dependency.name == gem_name }
+    return direct_dependency.requirement if direct_dependency
+
+    locked_spec = Bundler.locked_gems&.specs&.find { |spec| spec.name == gem_name }
+    return Gem::Requirement.new("= #{locked_spec.version}") if locked_spec
+
+    nil
+  rescue NoMethodError
+    nil
   end
 end
