@@ -44,6 +44,32 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
     expect(transport.writes.first.dig("session", "audio", "output", "voice")).must_equal "alloy"
   end
 
+  it "re-raises connect failures and preserves root cause details" do
+    transport = VoiceDriverTestHelpers::FakeTransport.new(
+      fail_writes_after: 0,
+      write_error: RuntimeError.new("session.update write failed")
+    )
+    errors = []
+
+    driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
+      api_key: "openai-key",
+      model: "gpt-realtime",
+      transport_factory: ->(url:, headers:) { transport },
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    error = expect {
+      driver.connect(
+        system_prompt: "You are helpful",
+        callbacks: {on_error: ->(event) { errors << event }}
+      )
+    }.must_raise RuntimeError
+
+    expect(error.message).must_include "session.update write failed"
+    expect(errors.map(&:code)).must_include "openai_realtime_connect_failed"
+  end
+
   it "strips unsupported strict flag from session tools" do
     transport = VoiceDriverTestHelpers::FakeTransport.new
 
@@ -177,6 +203,34 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
     expect(transport.writes[3].dig("response", "audio", "output", "format", "type")).must_equal "audio/pcm"
     expect(transport.writes[3].dig("response", "audio", "output", "format", "rate")).must_equal 24_000
     expect(transport.writes[4].dig("item", "call_id")).must_equal "call_1"
+  end
+
+  it "raises from send_text_turn when transport write fails and emits error event" do
+    transport = VoiceDriverTestHelpers::FakeTransport.new(
+      fail_writes_after: 1,
+      write_error: RuntimeError.new("conversation write failed")
+    )
+    errors = []
+
+    driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
+      api_key: "openai-key",
+      model: "gpt-realtime",
+      transport_factory: ->(url:, headers:) { transport },
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    driver.connect(
+      system_prompt: "You are helpful",
+      callbacks: {on_error: ->(event) { errors << event }}
+    )
+
+    error = expect {
+      driver.send_text_turn(text: "hello", role: "user")
+    }.must_raise Riffer::Error
+
+    expect(error.message).must_include "failed sending text turn"
+    expect(errors.map(&:code)).must_include "openai_realtime_send_text_failed"
   end
 
   it "defers response.create until response is completed when one is already active" do

@@ -58,7 +58,7 @@ class Riffer::Voice::Drivers::GeminiLive < Riffer::Voice::Drivers::Base
       retriable: true,
       metadata: {error_class: error.class.name}
     )
-    false
+    raise
   end
 
   #: (payload: String, mime_type: String) -> void
@@ -75,6 +75,7 @@ class Riffer::Voice::Drivers::GeminiLive < Riffer::Voice::Drivers::Base
     )
   rescue => error
     emit_error(code: "gemini_send_audio_failed", message: error.message, retriable: true, metadata: {error_class: error.class.name})
+    raise Riffer::Error, "gemini live failed sending audio chunk: #{error.class}: #{error.message}"
   end
 
   #: (text: String, ?role: String) -> void
@@ -94,6 +95,7 @@ class Riffer::Voice::Drivers::GeminiLive < Riffer::Voice::Drivers::Base
     )
   rescue => error
     emit_error(code: "gemini_send_text_failed", message: error.message, retriable: true, metadata: {error_class: error.class.name})
+    raise Riffer::Error, "gemini live failed sending text turn: #{error.class}: #{error.message}"
   end
 
   #: (call_id: String, result: untyped) -> void
@@ -109,6 +111,7 @@ class Riffer::Voice::Drivers::GeminiLive < Riffer::Voice::Drivers::Base
     )
   rescue => error
     emit_error(code: "gemini_send_tool_response_failed", message: error.message, retriable: true, metadata: {error_class: error.class.name})
+    raise Riffer::Error, "gemini live failed sending tool response: #{error.class}: #{error.message}"
   end
 
   #: (?reason: String?) -> void

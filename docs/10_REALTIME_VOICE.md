@@ -60,6 +60,23 @@ Voice models must use `provider/model` format:
 4. `events` (Enumerator) and `next_event(timeout:)`
 5. `close`
 
+## Validation and Error Behavior
+
+`Riffer::Voice.connect(...)` validates:
+
+- `model` and `system_prompt` are non-empty strings
+- `tools` is an array with valid entries
+- each tool entry must be either:
+  - a `Riffer::Tool` class
+  - an OpenAI-style function schema hash
+  - a Gemini-style function declaration hash
+
+Runtime and transport failures follow fail-fast semantics:
+
+- `send_text_turn`, `send_audio_chunk`, and `send_tool_response` raise on write failure
+- provider/runtime errors are still emitted as `Riffer::Voice::Events::Error`
+- connect failures preserve underlying exception context (no silent false success)
+
 ## End-to-End Example
 
 ```ruby

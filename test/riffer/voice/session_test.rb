@@ -103,6 +103,45 @@ describe Riffer::Voice::Session do
         Riffer::Voice.connect(model: "openai/gpt-realtime", system_prompt: "ok", adapter_factory: 123)
       }.must_raise Riffer::ArgumentError
     end
+
+    it "preserves adapter connect failure root cause instead of masking it" do
+      failing_adapter = Class.new do
+        def connect(system_prompt:, tools:, config:, on_event:)
+          raise Riffer::Error, "transport handshake timeout"
+        end
+
+        def connected?
+          false
+        end
+
+        def send_text_turn(text:)
+          true
+        end
+
+        def send_audio_chunk(payload:, mime_type:)
+          true
+        end
+
+        def send_tool_response(call_id:, result:)
+          true
+        end
+
+        def close
+          true
+        end
+      end.new
+
+      error = expect {
+        Riffer::Voice.connect(
+          model: "openai/gpt-realtime",
+          system_prompt: "ok",
+          adapter_factory: ->(**_kwargs) { failing_adapter }
+        )
+      }.must_raise Riffer::Error
+
+      expect(error.message).must_include "transport handshake timeout"
+      expect(error.message).wont_include "Voice adapter failed to connect"
+    end
   end
 
   describe "lifecycle and input contracts" do
@@ -160,6 +199,48 @@ describe Riffer::Voice::Session do
       expect { session.send_audio_chunk(payload: "", mime_type: "audio/pcm") }.must_raise Riffer::ArgumentError
       expect { session.send_audio_chunk(payload: "BASE64", mime_type: "") }.must_raise Riffer::ArgumentError
       expect { session.send_tool_response(call_id: "", result: {ok: true}) }.must_raise Riffer::ArgumentError
+    end
+
+    it "raises when adapter send fails instead of returning success" do
+      adapter_that_fails = Class.new do
+        def connect(system_prompt:, tools:, config:, on_event:)
+          @connected = true
+          true
+        end
+
+        def connected?
+          @connected == true
+        end
+
+        def send_text_turn(text:)
+          raise Riffer::Error, "write failed"
+        end
+
+        def send_audio_chunk(payload:, mime_type:)
+          true
+        end
+
+        def send_tool_response(call_id:, result:)
+          true
+        end
+
+        def close
+          @connected = false
+          true
+        end
+      end.new
+
+      failing_session = Riffer::Voice.connect(
+        model: "openai/gpt-realtime",
+        system_prompt: "You are helpful",
+        adapter_factory: ->(**_kwargs) { adapter_that_fails }
+      )
+
+      error = expect {
+        failing_session.send_text_turn(text: "hello")
+      }.must_raise Riffer::Error
+      expect(error.message).must_include "write failed"
+      failing_session.close
     end
 
     it "validates next_event timeout" do

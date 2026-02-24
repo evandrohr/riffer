@@ -115,6 +115,11 @@ gem 'websocket-client-simple'
 
 If runtime dependencies are missing, voice connection fails with a dependency load error when transport starts.
 
+Voice runtime operations are fail-fast:
+
+- send methods raise on transport/write failures
+- provider/runtime errors are also emitted as voice `Error` events for observability
+
 ## Agent-Level Configuration
 
 Override global configuration at the agent level:

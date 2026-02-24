@@ -62,6 +62,69 @@ describe "Riffer::Voice.connect validation" do
     session.close
   end
 
+  it "rejects invalid tools entries with indexed error messages" do
+    error = expect {
+      Riffer::Voice.connect(
+        model: "openai/gpt-realtime",
+        system_prompt: "You are helpful",
+        tools: [Class.new, "bad-tool-entry"],
+        adapter_factory: ->(**_kwargs) { TestSupport::Voice::FakeAdapter.new }
+      )
+    }.must_raise Riffer::ArgumentError
+
+    expect(error.message).must_include "tools[0]"
+  end
+
+  it "rejects invalid tools schema hashes" do
+    error = expect {
+      Riffer::Voice.connect(
+        model: "openai/gpt-realtime",
+        system_prompt: "You are helpful",
+        tools: [{"name" => "missing_parameters"}],
+        adapter_factory: ->(**_kwargs) { TestSupport::Voice::FakeAdapter.new }
+      )
+    }.must_raise Riffer::ArgumentError
+
+    expect(error.message).must_include "tools[0]"
+  end
+
+  it "accepts valid OpenAI-style and Gemini-style tool schema hashes" do
+    openai_tool = {
+      "type" => "function",
+      "name" => "lookup_patient",
+      "parameters" => {
+        "type" => "object",
+        "properties" => {
+          "id" => {"type" => "string"}
+        }
+      }
+    }
+    gemini_tool = {
+      "functionDeclarations" => [
+        {
+          "name" => "lookup_patient",
+          "parameters" => {
+            "type" => "object",
+            "properties" => {
+              "id" => {"type" => "string"}
+            }
+          }
+        }
+      ]
+    }
+    adapter = TestSupport::Voice::FakeAdapter.new
+
+    session = Riffer::Voice.connect(
+      model: "openai/gpt-realtime",
+      system_prompt: "You are helpful",
+      tools: [openai_tool, gemini_tool],
+      adapter_factory: ->(**_kwargs) { adapter }
+    )
+
+    expect(session).must_be :connected?
+    session.close
+  end
+
   it "preserves original connection failure when runtime shutdown also fails" do
     runtime_executor = Object.new
     def runtime_executor.shutdown

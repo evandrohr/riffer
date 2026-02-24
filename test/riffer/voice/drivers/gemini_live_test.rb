@@ -26,6 +26,32 @@ describe Riffer::Voice::Drivers::GeminiLive do
     expect(async_task.children.size).must_equal 1
   end
 
+  it "re-raises connect failures and preserves root cause details" do
+    failing_transport = VoiceDriverTestHelpers::FakeTransport.new(
+      fail_writes_after: 0,
+      write_error: RuntimeError.new("setup write failed")
+    )
+    errors = []
+
+    driver = Riffer::Voice::Drivers::GeminiLive.new(
+      api_key: "test-key",
+      model: "gemini-2.5-flash-native-audio-preview-12-2025",
+      transport_factory: ->(url:, headers:) { failing_transport },
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    error = expect {
+      driver.connect(
+        system_prompt: "You are helpful",
+        callbacks: {on_error: ->(event) { errors << event }}
+      )
+    }.must_raise RuntimeError
+
+    expect(error.message).must_include "setup write failed"
+    expect(errors.map(&:code)).must_include "gemini_connect_failed"
+  end
+
   it "does not duplicate models prefix when model is already prefixed" do
     driver = Riffer::Voice::Drivers::GeminiLive.new(
       api_key: "test-key",
@@ -91,6 +117,34 @@ describe Riffer::Voice::Drivers::GeminiLive do
       "message" => "no patient"
     )
     expect(function_response.key?("status")).must_equal false
+  end
+
+  it "raises from send_text_turn when transport write fails and emits error event" do
+    failing_transport = VoiceDriverTestHelpers::FakeTransport.new(
+      fail_writes_after: 1,
+      write_error: RuntimeError.new("clientContent write failed")
+    )
+    errors = []
+
+    driver = Riffer::Voice::Drivers::GeminiLive.new(
+      api_key: "test-key",
+      model: "gemini-2.5-flash-native-audio-preview-12-2025",
+      transport_factory: ->(url:, headers:) { failing_transport },
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    driver.connect(
+      system_prompt: "You are helpful",
+      callbacks: {on_error: ->(event) { errors << event }}
+    )
+
+    error = expect {
+      driver.send_text_turn(text: "hello", role: "user")
+    }.must_raise Riffer::Error
+
+    expect(error.message).must_include "failed sending text turn"
+    expect(errors.map(&:code)).must_include "gemini_send_text_failed"
   end
 
   it "preserves explicit name and nested response for tool response payloads" do

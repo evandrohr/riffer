@@ -135,7 +135,9 @@ class Riffer::Voice::Session
       config: @config,
       on_event: method(:emit_event)
     )
-    raise Riffer::Error, "Voice adapter failed to connect" unless connected
+    unless connected
+      raise Riffer::Error, "Voice adapter #{@adapter.class} failed to connect (returned false)"
+    end
 
     @state_lock.synchronize { @connected = true }
   rescue

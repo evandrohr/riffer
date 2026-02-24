@@ -4,10 +4,13 @@ module VoiceDriverTestHelpers
   class FakeTransport
     attr_reader :writes
 
-    def initialize(frames: [])
+    def initialize(frames: [], fail_writes_after: nil, write_error: nil)
       @frames = frames.dup
       @writes = []
       @closed = false
+      @fail_writes_after = fail_writes_after
+      @write_error = write_error || RuntimeError.new("fake transport write failure")
+      @write_count = 0
     end
 
     def read
@@ -15,6 +18,11 @@ module VoiceDriverTestHelpers
     end
 
     def write_json(payload)
+      @write_count += 1
+      if !@fail_writes_after.nil? && @write_count > @fail_writes_after
+        raise @write_error
+      end
+
       @writes << payload
     end
 
