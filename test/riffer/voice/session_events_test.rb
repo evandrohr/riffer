@@ -31,6 +31,21 @@ describe "Riffer::Voice::Session event APIs" do
     expect(session.next_event(timeout: 0.01)).must_be_nil
   end
 
+  it "returns nil from next_event without timeout when transport disconnects" do
+    session
+    results = Queue.new
+    waiter = Thread.new do
+      results << session.next_event
+    end
+
+    sleep 0.02
+    adapter.disconnect!
+
+    waiter.join(1)
+    expect(waiter.alive?).must_equal false
+    expect(results.pop).must_be_nil
+  end
+
   it "yields queued events in order via events enumerator and stops after close" do
     session
     first = Riffer::Voice::Events::OutputTranscript.new(text: "a")
@@ -50,6 +65,22 @@ describe "Riffer::Voice::Session event APIs" do
     session.close
 
     expect(received).must_equal [first, second]
+  end
+
+  it "stops the events enumerator when transport disconnects" do
+    session
+    finished = Queue.new
+    consumer = Thread.new do
+      session.events.each {}
+      finished << true
+    end
+
+    sleep 0.02
+    adapter.disconnect!
+
+    consumer.join(1)
+    expect(consumer.alive?).must_equal false
+    expect(finished.pop).must_equal true
   end
 
   it "validates emitted event type" do

@@ -6,6 +6,8 @@
 # Provides lifecycle, input contracts, and event stream/poll APIs.
 # Provider transport wiring is delegated to internal adapters.
 class Riffer::Voice::Session
+  EVENT_WAIT_POLL_INTERVAL = 0.05 #: Float
+
   # Voice model in provider/model format.
   attr_reader :model #: String
 
@@ -86,8 +88,11 @@ class Riffer::Voice::Session
     ensure_open!
     Enumerator.new do |yielder|
       loop do
-        event = @event_queue.pop(timeout: nil)
-        break if event.nil?
+        event = @event_queue.pop(timeout: EVENT_WAIT_POLL_INTERVAL)
+        if event.nil?
+          break unless connected?
+          next
+        end
 
         yielder << event
       end
@@ -100,7 +105,13 @@ class Riffer::Voice::Session
     invalid_timeout = !timeout.nil? && (!timeout.is_a?(Numeric) || timeout < 0)
     raise Riffer::ArgumentError, "timeout must be nil or >= 0" if invalid_timeout
 
-    @event_queue.pop(timeout: timeout)
+    return @event_queue.pop(timeout: timeout) unless timeout.nil?
+
+    loop do
+      event = @event_queue.pop(timeout: EVENT_WAIT_POLL_INTERVAL)
+      return event if event
+      return nil unless connected?
+    end
   end
 
   #: () -> void
