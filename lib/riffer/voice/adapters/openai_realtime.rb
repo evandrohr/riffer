@@ -3,7 +3,7 @@
 
 # Internal adapter for OpenAI realtime voice provider.
 class Riffer::Voice::Adapters::OpenAIRealtime < Riffer::Voice::Adapters::Base
-  #: (model: String, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync), ?driver_factory: ^(model: String, task_resolver: ^() -> untyped, transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, logger: untyped) -> untyped, ?logger: untyped) -> void
+  #: (model: String, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync), ?driver_factory: ^(model: String, task_resolver: ^() -> untyped, transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, response_state_lock: untyped, logger: untyped) -> untyped, ?logger: untyped) -> void
   def initialize(model:, runtime_executor:, driver_factory: nil, logger: nil)
     super(model: model, runtime_executor: runtime_executor, logger: logger)
     @driver_factory = driver_factory || method(:build_driver).to_proc
@@ -11,6 +11,7 @@ class Riffer::Voice::Adapters::OpenAIRealtime < Riffer::Voice::Adapters::Base
       model: model,
       task_resolver: driver_task_resolver,
       transport_factory: runtime_transport_factory,
+      response_state_lock: runtime_response_state_lock,
       logger: logger
     )
   end
@@ -52,12 +53,13 @@ class Riffer::Voice::Adapters::OpenAIRealtime < Riffer::Voice::Adapters::Base
 
   private
 
-  #: (model: String, task_resolver: ^() -> untyped, transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, logger: untyped) -> Riffer::Voice::Drivers::OpenAIRealtime
-  def build_driver(model:, task_resolver:, transport_factory:, logger:)
+  #: (model: String, task_resolver: ^() -> untyped, transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, response_state_lock: untyped, logger: untyped) -> Riffer::Voice::Drivers::OpenAIRealtime
+  def build_driver(model:, task_resolver:, transport_factory:, response_state_lock:, logger:)
     Riffer::Voice::Drivers::OpenAIRealtime.new(
       model: model,
       task_resolver: task_resolver,
       transport_factory: transport_factory,
+      response_state_lock: response_state_lock,
       logger: logger
     )
   end

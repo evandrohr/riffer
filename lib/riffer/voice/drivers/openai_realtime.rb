@@ -37,8 +37,8 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
     }.freeze
   }.freeze #: Hash[String, untyped]
 
-  #: (api_key: String?, ?model: String, ?endpoint: String, ?transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, ?parser: Riffer::Voice::Parsers::OpenAIRealtimeParser, ?task_resolver: ^() -> untyped, ?logger: untyped) -> void
-  def initialize(api_key: nil, model: DEFAULT_MODEL, endpoint: DEFAULT_ENDPOINT, transport_factory: nil, parser: Riffer::Voice::Parsers::OpenAIRealtimeParser.new, task_resolver: nil, logger: nil)
+  #: (api_key: String?, ?model: String, ?endpoint: String, ?transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, ?parser: Riffer::Voice::Parsers::OpenAIRealtimeParser, ?task_resolver: ^() -> untyped, ?response_state_lock: untyped, ?logger: untyped) -> void
+  def initialize(api_key: nil, model: DEFAULT_MODEL, endpoint: DEFAULT_ENDPOINT, transport_factory: nil, parser: Riffer::Voice::Parsers::OpenAIRealtimeParser.new, task_resolver: nil, response_state_lock: nil, logger: nil)
     super(model: model, logger: logger)
     @api_key = api_key || Riffer.config.openai.api_key
     @endpoint = endpoint
@@ -53,6 +53,7 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
     }
     @transport = nil
     @reader_task = nil
+    @response_state_lock = response_state_lock || NoopResponseStateLock.new
     @response_in_progress = false
     @response_create_pending = false
     @response_create_in_flight = false
@@ -149,9 +150,7 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
     @transport&.close
     @transport = nil
     @reader_task = nil
-    @response_in_progress = false
-    @response_create_pending = false
-    @response_create_in_flight = false
+    with_response_state_lock { reset_response_tracking! }
     log_debug(reason: reason)
   rescue => error
     emit_error(code: "openai_realtime_close_failed", message: error.message, retriable: false, metadata: {error_class: error.class.name})
@@ -365,9 +364,7 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
     @transport&.close
     @transport = nil
     @reader_task = nil
-    @response_in_progress = false
-    @response_create_pending = false
-    @response_create_in_flight = false
+    with_response_state_lock { reset_response_tracking! }
     mark_disconnected!
   rescue
     nil
@@ -375,64 +372,93 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
 
   #: () -> void
   def request_response_create
-    if @response_in_progress
-      @response_create_pending = true
-      return
+    should_send = false
+    with_response_state_lock do
+      if @response_in_progress
+        @response_create_pending = true
+      else
+        @response_in_progress = true
+        @response_create_in_flight = true
+        @response_create_pending = false
+        should_send = true
+      end
     end
 
+    return unless should_send
+
     @transport.write_json(response_create_payload)
-    @response_create_in_flight = true
-    @response_in_progress = true
-    @response_create_pending = false
+  rescue => error
+    with_response_state_lock do
+      @response_create_in_flight = false
+      @response_in_progress = false
+    end
+    raise error
   end
 
   #: (Hash[String, untyped]) -> void
   def update_response_tracking(payload)
     type = payload["type"].to_s
-
-    case type
-    when "response.created", "response.in_progress"
-      @response_create_in_flight = false
-      @response_in_progress = true
-    when "response.done", "response.completed", "response.cancelled", "response.canceled", "response.failed"
-      @response_create_in_flight = false
-      @response_in_progress = false
-      flush_pending_response_create
-    when "error"
-      update_response_tracking_from_error(payload)
+    should_flush = false
+    with_response_state_lock do
+      case type
+      when "response.created", "response.in_progress"
+        @response_create_in_flight = false
+        @response_in_progress = true
+      when "response.done", "response.completed", "response.cancelled", "response.canceled", "response.failed"
+        @response_create_in_flight = false
+        @response_in_progress = false
+        should_flush = @response_create_pending
+      when "error"
+        should_flush = update_response_tracking_from_error_unlocked(payload)
+      end
     end
+
+    flush_pending_response_create if should_flush
   rescue
     nil
   end
 
   #: (Hash[String, untyped]) -> void
-  def update_response_tracking_from_error(payload)
+  def update_response_tracking_from_error_unlocked(payload)
     error_payload = payload["error"].is_a?(Hash) ? payload["error"] : {}
     code = (error_payload["code"] || error_payload["type"] || "").to_s
     if code == "conversation_already_has_active_response"
       @response_create_in_flight = false
       @response_in_progress = true
       @response_create_pending = true
-      return
+      return false
     end
 
-    return unless @response_create_in_flight
+    return false unless @response_create_in_flight
 
     @response_create_in_flight = false
     @response_in_progress = false
-    flush_pending_response_create
+    @response_create_pending
   end
 
   #: () -> void
   def flush_pending_response_create
-    return unless @response_create_pending
-    return unless connected?
-    return if @response_in_progress
+    should_send = false
+    with_response_state_lock do
+      return unless @response_create_pending
+      return unless connected?
+      return if @response_in_progress
+
+      @response_in_progress = true
+      @response_create_in_flight = true
+      @response_create_pending = false
+      should_send = true
+    end
+
+    return unless should_send
 
     @transport.write_json(response_create_payload)
-    @response_in_progress = true
-    @response_create_pending = false
   rescue => error
+    with_response_state_lock do
+      @response_in_progress = false
+      @response_create_in_flight = false
+      @response_create_pending = true if connected?
+    end
     emit_error(
       code: "openai_realtime_send_response_create_failed",
       message: error.message,
@@ -475,6 +501,26 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
     )
   rescue
     nil
+  end
+
+  #: () -> void
+  def reset_response_tracking!
+    @response_in_progress = false
+    @response_create_pending = false
+    @response_create_in_flight = false
+  end
+
+  #: () { () -> untyped } -> untyped
+  def with_response_state_lock
+    @response_state_lock.synchronize { yield }
+  end
+
+  # Lock shim used for async/fiber runtime where cross-thread coordination is not required.
+  class NoopResponseStateLock
+    #: () { () -> untyped } -> untyped
+    def synchronize
+      yield
+    end
   end
 
   #: (payload: String, mime_type: String) -> String

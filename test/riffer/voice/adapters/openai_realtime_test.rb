@@ -78,6 +78,7 @@ describe Riffer::Voice::Adapters::OpenAIRealtime do
     expect(selected).must_equal :thread_transport
     expect(thread_calls.length).must_equal 1
     expect(async_calls).must_equal []
+    expect(driver.response_state_lock).must_be_instance_of Mutex
   end
 
   it "selects async websocket transport for async runtime" do
@@ -110,6 +111,7 @@ describe Riffer::Voice::Adapters::OpenAIRealtime do
     expect(selected).must_equal :async_transport
     expect(async_calls.length).must_equal 1
     expect(thread_calls).must_equal []
+    expect(driver.response_state_lock.is_a?(Mutex)).must_equal false
   end
 
   private

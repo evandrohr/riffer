@@ -63,6 +63,15 @@ class Riffer::Voice::Adapters::Base
   end
 
   #: () -> untyped
+  def runtime_response_state_lock
+    if runtime_executor.respond_to?(:kind) && runtime_executor.kind == :background
+      Mutex.new
+    else
+      NoopRuntimeLock.new
+    end
+  end
+
+  #: () -> untyped
   def driver_task
     if runtime_executor.respond_to?(:task)
       runtime_executor.task
@@ -83,6 +92,14 @@ class Riffer::Voice::Adapters::Base
       raise Riffer::ArgumentError, "async requires a block" unless block
 
       @runtime_executor.schedule(&block)
+    end
+  end
+
+  # Lock shim that avoids mutex usage for async/fiber runtime.
+  class NoopRuntimeLock
+    #: () { () -> untyped } -> untyped
+    def synchronize
+      yield
     end
   end
 end

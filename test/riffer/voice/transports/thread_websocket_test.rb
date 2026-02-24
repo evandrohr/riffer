@@ -87,7 +87,10 @@ describe Riffer::Voice::Transports::ThreadWebsocket do
       expect(error.message).must_include "Thread websocket connection error: boom"
 
       transport.close
+      transport.close
       expect(client.close_calls).must_equal 1
+      read_queue = transport.instance_variable_get(:@read_queue)
+      expect(read_queue.size).must_equal 1
       expect(transport.read).must_be_nil
     end
   end

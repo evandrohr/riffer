@@ -19,12 +19,13 @@ module TestSupport
     end
 
     class DriverDouble
-      attr_reader :model, :task_resolver, :transport_factory, :logger, :connect_calls, :text_turns, :audio_chunks, :tool_responses, :closed
+      attr_reader :model, :task_resolver, :transport_factory, :response_state_lock, :logger, :connect_calls, :text_turns, :audio_chunks, :tool_responses, :closed
 
-      def initialize(model:, task_resolver:, logger:, transport_factory: nil)
+      def initialize(model:, task_resolver:, logger:, transport_factory: nil, response_state_lock: nil)
         @model = model
         @task_resolver = task_resolver
         @transport_factory = transport_factory
+        @response_state_lock = response_state_lock
         @logger = logger
         @connect_calls = []
         @text_turns = []

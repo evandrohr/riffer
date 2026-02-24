@@ -13,6 +13,11 @@ describe Riffer::Voice::Parsers::OpenAIRealtimeParser do
     expect(events.first.mime_type).must_equal "audio/pcm;rate=24000"
   end
 
+  it "keeps parse_content_part private" do
+    expect(parser.class.private_instance_methods(false)).must_include :parse_content_part
+    expect(parser.class.public_instance_methods(false)).wont_include :parse_content_part
+  end
+
   it "parses response.audio.delta alias" do
     events = parser.call({"type" => "response.audio.delta", "delta" => "BASE64_AUDIO"})
 

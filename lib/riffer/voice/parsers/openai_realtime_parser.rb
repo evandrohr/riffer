@@ -68,6 +68,8 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
     end
   end
 
+  private
+
   #: (Hash[String, untyped], is_final: bool) -> Array[Riffer::Voice::Events::Base]
   def parse_content_part(data, is_final:)
     part = data["part"]
@@ -95,8 +97,6 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
 
     events
   end
-
-  private
 
   #: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
   def parse_audio_delta(data)

@@ -79,9 +79,11 @@ class Riffer::Voice::Transports::ThreadWebsocket
     return if @closed
 
     @closed = true
-    @client.close
-  ensure
-    @read_queue << CLOSE_SENTINEL
+    begin
+      @client.close
+    ensure
+      @read_queue << CLOSE_SENTINEL
+    end
   end
 
   private
