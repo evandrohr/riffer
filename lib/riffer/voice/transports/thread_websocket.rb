@@ -62,6 +62,8 @@ class Riffer::Voice::Transports::ThreadWebsocket
 
   #: () -> untyped
   def read
+    return nil if @closed && @read_queue.empty?
+
     frame = @read_queue.pop
     return nil if frame.equal?(CLOSE_SENTINEL)
     raise frame if frame.is_a?(Exception)

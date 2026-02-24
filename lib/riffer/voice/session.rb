@@ -143,8 +143,8 @@ class Riffer::Voice::Session
     @event_queue.close
     begin
       @adapter.close if @adapter.respond_to?(:close)
-    rescue
-      nil
+    rescue => error
+      Warning.warn("[riffer] adapter close failed during session cleanup: #{error.class}: #{error.message}\n")
     end
     @runtime_executor.shutdown
     @closed = true
@@ -165,6 +165,7 @@ class Riffer::Voice::Session
   def emit_event(event)
     raise Riffer::ArgumentError, "event must be a voice event" unless event.is_a?(Riffer::Voice::Events::Base)
 
+    # The queue closes before adapter shutdown, so late events are dropped intentionally.
     @event_queue.push(event)
     event
   end

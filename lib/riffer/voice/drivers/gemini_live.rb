@@ -135,6 +135,7 @@ class Riffer::Voice::Drivers::GeminiLive < Riffer::Voice::Drivers::Base
 
   #: () -> String
   def websocket_url
+    # Gemini Live requires API key authentication via query parameter.
     "#{@endpoint}?key=#{CGI.escape(@api_key)}"
   end
 
@@ -239,20 +240,6 @@ class Riffer::Voice::Drivers::GeminiLive < Riffer::Voice::Drivers::Base
     end
   end
 
-  #: (untyped) -> untyped
-  def deep_stringify(value)
-    case value
-    when Hash
-      value.each_with_object({}) do |(key, nested_value), result|
-        result[key.to_s] = deep_stringify(nested_value)
-      end
-    when Array
-      value.map { |item| deep_stringify(item) }
-    else
-      value
-    end
-  end
-
   #: (call_id: String, result: untyped) -> Hash[String, untyped]
   def normalize_tool_response_payload(call_id:, result:)
     unless result.is_a?(Hash)
@@ -278,19 +265,6 @@ class Riffer::Voice::Drivers::GeminiLive < Riffer::Voice::Drivers::Base
 
     tool_payload["response"] = response_value.is_a?(Hash) ? response_value : {"result" => response_value}
     tool_payload
-  end
-
-  #: (Hash[String, untyped], Hash[String, untyped]) -> Hash[String, untyped]
-  def deep_merge(base, overrides)
-    merged = base.dup
-    overrides.each do |key, value|
-      merged[key] = if merged[key].is_a?(Hash) && value.is_a?(Hash)
-        deep_merge(merged[key], value)
-      else
-        value
-      end
-    end
-    merged
   end
 
   #: () -> void

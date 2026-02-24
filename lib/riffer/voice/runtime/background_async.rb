@@ -58,8 +58,8 @@ class Riffer::Voice::Runtime::BackgroundAsync
       break if item.equal?(SHUTDOWN_SIGNAL)
 
       item.call
-    rescue
-      # Swallow worker exceptions in this phase.
+    rescue => error
+      Warning.warn("[riffer] background worker task failed: #{error.class}: #{error.message}\n")
       nil
     end
   end

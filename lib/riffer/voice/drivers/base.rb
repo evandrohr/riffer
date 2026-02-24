@@ -168,6 +168,33 @@ class Riffer::Voice::Drivers::Base
     end
   end
 
+  #: (Hash[String, untyped], Hash[String, untyped]) -> Hash[String, untyped]
+  def deep_merge(base, overrides)
+    merged = base.dup
+    overrides.each do |key, value|
+      merged[key] = if merged[key].is_a?(Hash) && value.is_a?(Hash)
+        deep_merge(merged[key], value)
+      else
+        value
+      end
+    end
+    merged
+  end
+
+  #: (untyped) -> untyped
+  def deep_stringify(value)
+    case value
+    when Hash
+      value.each_with_object({}) do |(key, nested), result|
+        result[key.to_s] = deep_stringify(nested)
+      end
+    when Array
+      value.map { |item| deep_stringify(item) }
+    else
+      value
+    end
+  end
+
   #: (singleton(Riffer::Tool)) -> Hash[Symbol, untyped]
   def tool_to_json_schema(tool)
     {
