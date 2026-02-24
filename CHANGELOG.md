@@ -7,12 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### ⚠ BREAKING CHANGES
-
-* realtime voice now uses a single public session API (`Riffer::Voice.connect` + `Riffer::Voice::Session`); callback-first driver usage is removed from supported public docs
-* voice models must use `provider/model` format (`openai/...` or `gemini/...`); legacy prefixes such as `openai_realtime/*` and `gemini_live/*` are no longer supported
-* `Riffer::Voice::Events::ToolCall#arguments` is now always a hash; use `event.arguments_hash` for explicit access
-
 ### Features
 
 * add runtime-flexible voice sessions with async/fiber and background/thread support

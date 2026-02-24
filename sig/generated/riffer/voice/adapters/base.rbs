@@ -39,6 +39,9 @@ class Riffer::Voice::Adapters::Base
   def runtime_transport_factory: () -> ^(url: String, headers: Hash[String, String]) -> untyped
 
   # : () -> untyped
+  def runtime_response_state_lock: () -> untyped
+
+  # : () -> untyped
   def driver_task: () -> untyped
 
   # Async task compatibility shim backed by voice runtime scheduling.
@@ -48,5 +51,11 @@ class Riffer::Voice::Adapters::Base
 
     # : (?annotation: String?) { () -> untyped } -> untyped
     def async: (?annotation: String?) { () -> untyped } -> untyped
+  end
+
+  # Lock shim that avoids mutex usage for async/fiber runtime.
+  class NoopRuntimeLock
+    # : () { () -> untyped } -> untyped
+    def synchronize: () { () -> untyped } -> untyped
   end
 end

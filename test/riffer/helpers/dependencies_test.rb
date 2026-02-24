@@ -122,7 +122,7 @@ describe Riffer::Helpers::Dependencies do
         bundler_definition = Struct.new(:dependencies).new([])
         bundler_locked = Struct.new(:specs).new([locked_spec])
 
-        with_singleton_stub(Gem, :loaded_specs, { gem_name => loaded_spec }) do
+        with_singleton_stub(Gem, :loaded_specs, {gem_name => loaded_spec}) do
           with_singleton_stub(Bundler, :load, bundler_definition) do
             with_singleton_stub(Bundler, :locked_gems, bundler_locked) do
               result = instance.depends_on(gem_name, req: false)
@@ -148,7 +148,7 @@ describe Riffer::Helpers::Dependencies do
         bundler_definition = Struct.new(:dependencies).new([])
         bundler_locked = Struct.new(:specs).new([])
 
-        error = with_singleton_stub(Gem, :loaded_specs, { gem_name => loaded_spec }) do
+        error = with_singleton_stub(Gem, :loaded_specs, {gem_name => loaded_spec}) do
           with_singleton_stub(Bundler, :load, bundler_definition) do
             with_singleton_stub(Bundler, :locked_gems, bundler_locked) do
               assert_raises(Riffer::Helpers::Dependencies::VersionError) do

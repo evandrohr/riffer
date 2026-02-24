@@ -45,10 +45,10 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
   # : (Hash[Symbol | String, untyped]) -> Array[Riffer::Voice::Events::Base]
   def call: (Hash[Symbol | String, untyped]) -> Array[Riffer::Voice::Events::Base]
 
+  private
+
   # : (Hash[String, untyped], is_final: bool) -> Array[Riffer::Voice::Events::Base]
   def parse_content_part: (Hash[String, untyped], is_final: bool) -> Array[Riffer::Voice::Events::Base]
-
-  private
 
   # : (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
   def parse_audio_delta: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
@@ -88,6 +88,9 @@ class Riffer::Voice::Parsers::OpenAIRealtimeParser < Riffer::Voice::Parsers::Bas
 
   # : (untyped) -> Hash[String, untyped]
   def parse_arguments: (untyped) -> Hash[String, untyped]
+
+  # : (String) -> void
+  def warn_invalid_tool_arguments: (String) -> void
 
   # : (String) -> bool
   def retriable_error?: (String) -> bool

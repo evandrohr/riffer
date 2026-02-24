@@ -22,4 +22,9 @@ module Riffer::Helpers::Dependencies
   #
   # : (String, ?req: (bool | String)) -> true
   def depends_on: (String, ?req: bool | String) -> true
+
+  private
+
+  # : (String) -> Gem::Requirement?
+  def dependency_requirement: (String) -> Gem::Requirement?
 end

@@ -18,8 +18,8 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
 
   RESPONSE_CREATE_PAYLOAD: Hash[String, untyped]
 
-  # : (api_key: String?, ?model: String, ?endpoint: String, ?transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, ?parser: Riffer::Voice::Parsers::OpenAIRealtimeParser, ?task_resolver: ^() -> untyped, ?logger: untyped) -> void
-  def initialize: (api_key: String?, ?model: String, ?endpoint: String, ?transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, ?parser: Riffer::Voice::Parsers::OpenAIRealtimeParser, ?task_resolver: ^() -> untyped, ?logger: untyped) -> void
+  # : (api_key: String?, ?model: String, ?endpoint: String, ?transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, ?parser: Riffer::Voice::Parsers::OpenAIRealtimeParser, ?task_resolver: ^() -> untyped, ?response_state_lock: untyped, ?logger: untyped) -> void
+  def initialize: (api_key: String?, ?model: String, ?endpoint: String, ?transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, ?parser: Riffer::Voice::Parsers::OpenAIRealtimeParser, ?task_resolver: ^() -> untyped, ?response_state_lock: untyped, ?logger: untyped) -> void
 
   # : (system_prompt: String, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], ?config: Hash[Symbol | String, untyped], ?callbacks: Hash[Symbol, ^(Riffer::Voice::Events::Base) -> void]) -> bool
   def connect: (system_prompt: String, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], ?config: Hash[Symbol | String, untyped], ?callbacks: Hash[Symbol, ^(Riffer::Voice::Events::Base) -> void]) -> bool
@@ -65,12 +65,6 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
   # : (String) -> String
   def normalize_openai_pattern: (String) -> String
 
-  # : (Hash[String, untyped], Hash[String, untyped]) -> Hash[String, untyped]
-  def deep_merge: (Hash[String, untyped], Hash[String, untyped]) -> Hash[String, untyped]
-
-  # : (untyped) -> untyped
-  def deep_stringify: (untyped) -> untyped
-
   # : () -> Hash[String, untyped]
   def response_create_payload: () -> Hash[String, untyped]
 
@@ -93,7 +87,7 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
   def update_response_tracking: (Hash[String, untyped]) -> void
 
   # : (Hash[String, untyped]) -> void
-  def update_response_tracking_from_error: (Hash[String, untyped]) -> void
+  def update_response_tracking_from_error_unlocked: (Hash[String, untyped]) -> void
 
   # : () -> void
   def flush_pending_response_create: () -> void
@@ -103,6 +97,18 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
 
   # : (payload: Hash[String, untyped], parsed_events: Array[Riffer::Voice::Events::Base]) -> void
   def log_response_payload: (payload: Hash[String, untyped], parsed_events: Array[Riffer::Voice::Events::Base]) -> void
+
+  # : () -> void
+  def reset_response_tracking!: () -> void
+
+  # : () { () -> untyped } -> untyped
+  def with_response_state_lock: () { () -> untyped } -> untyped
+
+  # Lock shim used for async/fiber runtime where cross-thread coordination is not required.
+  class NoopResponseStateLock
+    # : () { () -> untyped } -> untyped
+    def synchronize: () { () -> untyped } -> untyped
+  end
 
   # : (payload: String, mime_type: String) -> String
   def normalize_input_audio_payload: (payload: String, mime_type: String) -> String

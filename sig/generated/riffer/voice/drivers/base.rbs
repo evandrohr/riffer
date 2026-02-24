@@ -63,6 +63,12 @@ class Riffer::Voice::Drivers::Base
   # : (Hash[Symbol | String, untyped]) -> Hash[String, untyped]
   def stringify_hash: (Hash[Symbol | String, untyped]) -> Hash[String, untyped]
 
+  # : (Hash[String, untyped], Hash[String, untyped]) -> Hash[String, untyped]
+  def deep_merge: (Hash[String, untyped], Hash[String, untyped]) -> Hash[String, untyped]
+
+  # : (untyped) -> untyped
+  def deep_stringify: (untyped) -> untyped
+
   # : (singleton(Riffer::Tool)) -> Hash[Symbol, untyped]
   def tool_to_json_schema: (singleton(Riffer::Tool)) -> Hash[Symbol, untyped]
 
