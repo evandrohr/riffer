@@ -148,11 +148,20 @@ class Riffer::Voice::Parsers::GeminiLiveParser < Riffer::Voice::Parsers::Base
     return deep_stringify(arguments) if arguments.is_a?(Hash)
 
     parsed = JSON.parse(arguments.to_s)
-    return deep_stringify(parsed) if parsed.is_a?(Hash)
+    unless parsed.is_a?(Hash)
+      warn_invalid_tool_arguments("expected JSON object, got #{parsed.class}")
+      return {}
+    end
 
+    deep_stringify(parsed)
+  rescue JSON::ParserError => error
+    warn_invalid_tool_arguments("json parse failed (#{error.class}: #{error.message})")
     {}
-  rescue JSON::ParserError
-    {}
+  end
+
+  #: (String) -> void
+  def warn_invalid_tool_arguments(reason)
+    Warning.warn("[riffer] gemini parser normalized invalid tool arguments: #{reason}\n")
   end
 
   #: (Hash[String, untyped], Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]

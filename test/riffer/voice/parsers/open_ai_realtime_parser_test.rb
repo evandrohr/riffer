@@ -63,33 +63,43 @@ describe Riffer::Voice::Parsers::OpenAIRealtimeParser do
   end
 
   it "normalizes invalid tool call argument payloads to empty hash" do
-    events = parser.call(
-      {
-        "type" => "response.function_call_arguments.done",
-        "call_id" => "call_1",
-        "name" => "lookup",
-        "arguments" => "not-json"
-      }
-    )
+    events = nil
+    _output, error_output = capture_io do
+      events = parser.call(
+        {
+          "type" => "response.function_call_arguments.done",
+          "call_id" => "call_1",
+          "name" => "lookup",
+          "arguments" => "not-json"
+        }
+      )
+    end
 
     event = events.first
     expect(event).must_be_instance_of Riffer::Voice::Events::ToolCall
     expect(event.arguments).must_equal({})
+    expect(error_output).must_include "normalized invalid tool arguments"
+    expect(error_output).must_include "json parse failed"
   end
 
   it "normalizes non-object json tool call arguments to empty hash" do
-    events = parser.call(
-      {
-        "type" => "response.function_call_arguments.done",
-        "call_id" => "call_1",
-        "name" => "lookup",
-        "arguments" => "[1,2,3]"
-      }
-    )
+    events = nil
+    _output, error_output = capture_io do
+      events = parser.call(
+        {
+          "type" => "response.function_call_arguments.done",
+          "call_id" => "call_1",
+          "name" => "lookup",
+          "arguments" => "[1,2,3]"
+        }
+      )
+    end
 
     event = events.first
     expect(event).must_be_instance_of Riffer::Voice::Events::ToolCall
     expect(event.arguments).must_equal({})
+    expect(error_output).must_include "normalized invalid tool arguments"
+    expect(error_output).must_include "expected JSON object"
   end
 
   it "ignores function_call output items to avoid duplicate tool call events" do

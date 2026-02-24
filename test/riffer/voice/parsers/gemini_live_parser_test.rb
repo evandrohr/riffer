@@ -103,8 +103,13 @@ describe Riffer::Voice::Parsers::GeminiLiveParser do
       }
     }
 
-    events = parser.call(payload)
+    events = nil
+    _output, error_output = capture_io do
+      events = parser.call(payload)
+    end
     expect(events.map(&:class)).must_equal([Riffer::Voice::Events::ToolCall])
     expect(events.first.arguments).must_equal({})
+    expect(error_output).must_include "normalized invalid tool arguments"
+    expect(error_output).must_include "json parse failed"
   end
 end
