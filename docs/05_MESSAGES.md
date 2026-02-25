@@ -65,6 +65,28 @@ if msg.token_usage
 end
 ```
 
+#### Structured Output on Messages
+
+When an agent has `structured_output` configured, the final assistant message stores the parsed hash directly. The `structured_output?` predicate checks for a non-nil value:
+
+```ruby
+msg = Riffer::Messages::Assistant.new('{"sentiment":"positive"}', structured_output: {sentiment: "positive"})
+msg.structured_output?    # => true
+msg.structured_output     # => {sentiment: "positive"}
+
+# When not provided, structured_output returns nil
+msg = Riffer::Messages::Assistant.new('{"sentiment":"positive"}')
+msg.structured_output?    # => false
+msg.structured_output     # => nil
+```
+
+The `to_h` representation includes `structured_output` only when present:
+
+```ruby
+msg = Riffer::Messages::Assistant.new('{"sentiment":"positive"}', structured_output: {sentiment: "positive"})
+msg.to_h  # => {role: :assistant, content: '{"sentiment":"positive"}', structured_output: {sentiment: "positive"}}
+```
+
 ### Tool
 
 Tool messages contain the results of tool executions:

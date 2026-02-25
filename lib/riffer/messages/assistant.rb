@@ -19,16 +19,25 @@ class Riffer::Messages::Assistant < Riffer::Messages::Base
   # Token usage data for this response.
   attr_reader :token_usage #: Riffer::TokenUsage?
 
-  #: (String, ?tool_calls: Array[Riffer::Messages::Assistant::ToolCall], ?token_usage: Riffer::TokenUsage?) -> void
-  def initialize(content, tool_calls: [], token_usage: nil)
+  # Parsed structured output hash, or nil when not applicable.
+  attr_reader :structured_output #: Hash[Symbol, untyped]?
+
+  #: (String, ?tool_calls: Array[Riffer::Messages::Assistant::ToolCall], ?token_usage: Riffer::TokenUsage?, ?structured_output: Hash[Symbol, untyped]?) -> void
+  def initialize(content, tool_calls: [], token_usage: nil, structured_output: nil)
     super(content)
     @tool_calls = tool_calls
     @token_usage = token_usage
+    @structured_output = structured_output
   end
 
   #: () -> Symbol
   def role
     :assistant
+  end
+
+  # @rbs () -> bool
+  def structured_output?
+    !@structured_output.nil?
   end
 
   # Converts the message to a hash.
@@ -38,6 +47,7 @@ class Riffer::Messages::Assistant < Riffer::Messages::Base
     hash = {role: role, content: content}
     hash[:tool_calls] = tool_calls.map(&:to_h) unless tool_calls.empty?
     hash[:token_usage] = token_usage.to_h if token_usage
+    hash[:structured_output] = structured_output if structured_output?
     hash
   end
 end
