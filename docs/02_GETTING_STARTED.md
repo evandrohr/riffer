@@ -188,6 +188,11 @@ end
 
 If you want automatic voice tool execution, use `Riffer::Voice::Agent` on top of sessions (see [Realtime Voice](10_REALTIME_VOICE.md#voice-agent-optional-orchestration)).
 
+Session vs Agent quick start:
+
+- use `Riffer::Voice::Session` for low-level provider/event control
+- use `Riffer::Voice::Agent` for orchestration features (auto tool handling, profiles, policy gates, run helpers, durability checkpoints)
+
 ## Next Steps
 
 - [Agents](03_AGENTS.md) - Agent configuration options

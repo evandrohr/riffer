@@ -30,7 +30,7 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 | VA5 | Policy gates + action budgets | DONE | Riffer maintainers | budget counters + mutation classifier + policy/approval hooks |
 | VA6 | Run helpers + lifecycle semantics | DONE | Riffer maintainers | `run_loop`, `run_until_turn_complete`, `drain_available_events` |
 | VA7 | Durability hooks | DONE | Riffer maintainers | checkpoint callbacks + snapshot export/import for app-managed resume |
-| VA8 | Docs/examples/migration guidance | PLANNED | Riffer maintainers | Session vs Voice Agent, profile/policy/durability examples |
+| VA8 | Docs/examples/migration guidance | DONE | Riffer maintainers | Session-vs-Agent guidance + migration snippets + responsibility boundaries |
 | VA9 | Test matrix + final QA | PLANNED | Riffer maintainers | runtime/tool/profile/policy/durability matrix and suite verification |
 
 ## Task Checklist
@@ -44,7 +44,7 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 - [x] Add policy hooks (approval + budget + mutation classifier interface).
 - [x] Add helper methods for common event loops.
 - [x] Add snapshot/checkpoint hooks for durability integration.
-- [ ] Add migration examples from manual session loops.
+- [x] Add migration examples from manual session loops.
 - [ ] Expand tests for async/background runtime matrix.
 - [ ] Run full quality gates and record results.
 
@@ -70,6 +70,7 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 
 | Date | Command | Result | Notes |
 | --- | --- | --- | --- |
+| 2026-02-28 | `RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake standard` | Pass | VA8 docs pass (no style regressions) |
 | 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/agent_test.rb` | Pass | VA7 durability coverage added (`44 runs, 0 failures`) |
 | 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/session_test.rb` | Pass | regression check after VA7 durability hooks |
 | 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/connect_validation_test.rb` | Pass | connect/validation behavior preserved after VA7 |
@@ -104,6 +105,15 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 ## Session Change Log (Newest First)
 
 ## 2026-02-28
+
+- Completed VA8 (`Docs/examples/migration guidance`) with:
+  - added explicit "Session vs Voice Agent" guidance in `docs/10_REALTIME_VOICE.md`.
+  - added migration examples from manual `Session` loops to `Voice::Agent` helpers.
+  - documented framework/app boundary:
+    - telephony, persistence, scheduling, and authoring remain app responsibilities.
+  - updated onboarding doc (`docs/02_GETTING_STARTED.md`) with Session-vs-Agent quick guidance.
+- Next step:
+  - execute VA9 from `docs/voice-agent-implementation-plan.md`.
 
 - Completed VA7 (`Durability hooks`) with:
   - checkpoint callback API:

@@ -61,6 +61,23 @@ Voice models must use `provider/model` format:
 4. `events` (Enumerator) and `next_event(timeout:)`
 5. `close`
 
+## Session vs Voice Agent
+
+Use `Riffer::Voice::Session` when you want low-level control over transport/event loops.
+
+Use `Riffer::Voice::Agent` when you want orchestration conveniences:
+
+- automatic tool-call handling
+- callback registry
+- profiles/policy/budget controls
+- run-loop helper methods
+- durability checkpoints and metadata snapshots
+
+Quick rule:
+
+- start with `Session` for provider/debug/transport work
+- start with `Voice::Agent` for product/application voice behaviors
+
 ## Voice Agent (Optional Orchestration)
 
 `Riffer::Voice::Agent` wraps `Riffer::Voice::Session` and can automatically execute
@@ -379,6 +396,73 @@ ensure
   session.close
 end
 ```
+
+## Migration From Manual Session Loops
+
+Before (manual `Session` loop):
+
+```ruby
+session = Riffer::Voice.connect(...)
+
+begin
+  session.send_text_turn(text: "Help me")
+
+  loop do
+    event = session.next_event(timeout: 5)
+    break if event.nil?
+
+    case event
+    when Riffer::Voice::Events::ToolCall
+      result = MyTool.new.call(context: nil, **event.arguments_hash.transform_keys(&:to_sym))
+      session.send_tool_response(call_id: event.call_id, result: result)
+    when Riffer::Voice::Events::TurnComplete, Riffer::Voice::Events::Interrupt
+      break
+    end
+  end
+ensure
+  session.close
+end
+```
+
+After (`Voice::Agent` orchestration):
+
+```ruby
+class SupportVoiceAgent < Riffer::Voice::Agent
+  model "openai/gpt-realtime-1.5"
+  instructions "You are a concise voice assistant."
+  uses_tools [MyTool]
+end
+
+agent = SupportVoiceAgent.connect
+
+begin
+  events = agent.run_until_turn_complete(text: "Help me", timeout: 5)
+  puts "processed #{events.length} events"
+ensure
+  agent.close
+end
+```
+
+If you need direct loop control but still want orchestration features:
+
+```ruby
+agent.run_loop(timeout: 10) do |event|
+  break if event.is_a?(Riffer::Voice::Events::TurnComplete)
+end
+```
+
+## Responsibility Boundary
+
+`Riffer::Voice::Agent` intentionally focuses on runtime orchestration only.
+
+Application responsibilities remain outside Riffer core:
+
+- telephony integrations (Twilio/Telnyx/etc.)
+- persistent workflow storage
+- durable job scheduling/retries
+- skill/authoring management planes
+
+Use checkpoints and snapshots to connect `Voice::Agent` to your own persistence and workflow layers.
 
 ## Event Types
 
