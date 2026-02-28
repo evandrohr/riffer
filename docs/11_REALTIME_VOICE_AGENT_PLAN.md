@@ -73,6 +73,40 @@ Results:
   - `A`: `agent.rb`, `class_configuration.rb`, `class_configuration_helpers.rb`, `class_connect_options.rb`, `class_runtime_profiles.rb`, `class_tool_defaults.rb`, `event_loop.rb`, `initialization_state.rb`, `state_snapshot.rb`
   - `B`: `event_loop_support.rb`, `session_lifecycle.rb`
 
+## Progress Checkpoint (2026-02-28, VA5)
+
+Refactor quality gate command:
+
+```sh
+RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake
+bundle exec rubycritic -f json --no-browser --path tmp/rubycritic-va5-final2 \
+  lib/riffer/voice/drivers/base.rb \
+  lib/riffer/voice/drivers/runtime_support.rb \
+  lib/riffer/voice/drivers/realtime_lifecycle_support.rb \
+  lib/riffer/voice/drivers/openai_realtime.rb \
+  lib/riffer/voice/drivers/openai_realtime_connection.rb \
+  lib/riffer/voice/drivers/openai_realtime_session_config.rb \
+  lib/riffer/voice/drivers/openai_realtime_response_state.rb \
+  lib/riffer/voice/drivers/openai_realtime_response_flow.rb \
+  lib/riffer/voice/drivers/openai_realtime_response_logging.rb \
+  lib/riffer/voice/drivers/openai_realtime_audio.rb \
+  lib/riffer/voice/drivers/openai_realtime_lifecycle.rb \
+  lib/riffer/voice/drivers/openai_realtime_dispatch.rb \
+  lib/riffer/voice/drivers/gemini_live.rb \
+  lib/riffer/voice/drivers/gemini_live_connection.rb \
+  lib/riffer/voice/drivers/gemini_live_payloads.rb \
+  lib/riffer/voice/drivers/gemini_live_lifecycle.rb \
+  lib/riffer/voice/drivers/gemini_live_dispatch.rb
+```
+
+Results:
+
+- Checks: `bundle exec rake` passing (tests + standard + steep).
+- RubyCritic score (touched set): `87.73`.
+- Touched driver files are `A` or `B`:
+  - `A`: `gemini_live.rb`, `gemini_live_dispatch.rb`, `openai_realtime.rb`, `openai_realtime_dispatch.rb`, `openai_realtime_response_logging.rb`, `openai_realtime_response_state.rb`, `realtime_lifecycle_support.rb`, `runtime_support.rb`
+  - `B`: `base.rb`, `gemini_live_connection.rb`, `gemini_live_lifecycle.rb`, `gemini_live_payloads.rb`, `openai_realtime_audio.rb`, `openai_realtime_connection.rb`, `openai_realtime_lifecycle.rb`, `openai_realtime_response_flow.rb`, `openai_realtime_session_config.rb`
+
 ## Implementation Sequence
 
 Use this order for the best impact/effort ratio:
@@ -135,9 +169,9 @@ Success criteria:
 
 ### VA5. Driver deduplication
 
-- [ ] Identify shared translation logic between OpenAI and Gemini drivers.
-- [ ] Move shared behavior to `drivers/base` or a dedicated internal helper.
-- [ ] Preserve provider-specific behavior in leaf drivers.
+- [x] Identify shared translation logic between OpenAI and Gemini drivers.
+- [x] Move shared behavior to `drivers/base` or a dedicated internal helper.
+- [x] Preserve provider-specific behavior in leaf drivers.
 
 Success criteria:
 
@@ -173,7 +207,7 @@ Success criteria:
 | VA2 | `[x]` | current branch | Nil-check and duplicate dispatch reduced via focused class DSL/runtime modules and helpers. |
 | VA3 | `[x]` | current branch | Event loop orchestration moved to `event_loop` + `event_loop_support`. |
 | VA4 | `[x]` | current branch | Session lifecycle and snapshot orchestration extracted; `agent.rb` now thin coordinator (`A`). |
-| VA5 | `[ ]` |  |  |
+| VA5 | `[x]` | current branch | Shared runtime/lifecycle helpers + split OpenAI/Gemini driver concerns into focused modules. |
 | VA6 | `[ ]` |  |  |
 | VA7 | `[ ]` |  |  |
 
