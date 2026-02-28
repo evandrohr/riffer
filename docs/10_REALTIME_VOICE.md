@@ -137,6 +137,45 @@ Notes:
 
 `voice_config` is deep-merged with `connect(config: ...)`, where explicit `connect` values win.
 
+### Voice Agent Profiles
+
+Profiles let one `Riffer::Voice::Agent` class expose multiple role-like runtime bundles.
+
+```ruby
+class SupportVoiceAgent < Riffer::Voice::Agent
+  model "openai/gpt-realtime-1.5"
+  instructions "Base assistant behavior."
+  uses_tools [LookupWeatherTool]
+  runtime :background
+  voice_config("temperature" => 0.2)
+
+  profile :receptionist do
+    instructions "Receptionist behavior."
+    runtime :auto
+    uses_tools []
+    voice_config("temperature" => 0.0)
+  end
+end
+
+agent = SupportVoiceAgent.connect(profile: :receptionist)
+```
+
+Supported profile fields:
+
+- `model`
+- `instructions`
+- `uses_tools`
+- `runtime`
+- `voice_config`
+- `tool_executor`
+
+Precedence with profiles is:
+
+1. explicit `connect(...)` arguments
+2. selected profile values
+3. class-level defaults
+4. built-in fallback defaults
+
 ### Voice Agent Event Callbacks
 
 `Riffer::Voice::Agent` supports callback registration over normalized typed events:

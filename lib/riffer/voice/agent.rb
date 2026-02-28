@@ -112,6 +112,34 @@ class Riffer::Voice::Agent
     @auto_handle_tool_calls = value
   end
 
+  # Defines or retrieves a named profile config bundle.
+  #
+  # When called with a block, the profile is defined/updated.
+  # When called without a block, returns the stored profile hash or nil.
+  #
+  #: ((String | Symbol), ?{ () -> void }) -> Hash[Symbol, untyped]?
+  def self.profile(name, &block)
+    profile_name = normalize_profile_name!(name)
+
+    if block_given?
+      definition = ProfileDefinition.new
+      definition.instance_exec(&block)
+      profiles = @profiles || {}
+      profiles[profile_name] = definition.to_h
+      @profiles = profiles
+      return deep_copy(@profiles[profile_name])
+    end
+
+    deep_copy((@profiles || {})[profile_name])
+  end
+
+  # Returns all named profile definitions.
+  #
+  #: () -> Hash[Symbol, Hash[Symbol, untyped]]
+  def self.profiles
+    deep_copy(@profiles || {})
+  end
+
   #: (**untyped) -> Riffer::Voice::Agent
   def self.connect(**kwargs)
     tool_context = kwargs.delete(:tool_context)
@@ -149,18 +177,24 @@ class Riffer::Voice::Agent
   end
 
   #: (?model: String?, ?system_prompt: String?, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]?, ?config: Hash[Symbol | String, untyped]?, ?runtime: Symbol?, ?tool_executor: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped?, ?adapter_factory: ^(adapter_identifier: Symbol, model: String, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync)) -> untyped) -> self
-  def connect(model: nil, system_prompt: nil, tools: nil, config: nil, runtime: nil, tool_executor: nil, adapter_factory: nil)
+  def connect(model: nil, system_prompt: nil, tools: nil, config: nil, runtime: nil, profile: nil, tool_executor: nil, adapter_factory: nil)
     close if @session && !@session.closed?
+    profile_config = resolve_profile(profile)
+
     unless tool_executor.nil?
       validate_tool_executor!(tool_executor, "tool_executor")
       @tool_executor = tool_executor
     end
+    if tool_executor.nil? && profile_config.key?(:tool_executor)
+      validate_tool_executor!(profile_config[:tool_executor], "profile tool_executor")
+      @tool_executor = profile_config[:tool_executor]
+    end
 
-    resolved_model = resolve_model(model)
-    resolved_system_prompt = resolve_system_prompt(system_prompt)
-    resolved_tools = resolve_tools(tools)
-    resolved_config = resolve_config(config)
-    resolved_runtime = resolve_runtime(runtime)
+    resolved_model = resolve_model(model, profile_config)
+    resolved_system_prompt = resolve_system_prompt(system_prompt, profile_config)
+    resolved_tools = resolve_tools(tools, profile_config)
+    resolved_config = resolve_config(config, profile_config)
+    resolved_runtime = resolve_runtime(runtime, profile_config)
 
     @session = Riffer::Voice.connect(
       model: resolved_model,
@@ -563,9 +597,25 @@ class Riffer::Voice::Agent
       "on_tool_execution_error callback failed for #{hook_payload[:tool_name]}: #{hook_error.class}: #{hook_error.message}"
   end
 
-  #: (String?) -> String
-  def resolve_model(model_override)
+  #: ((String | Symbol)?) -> Hash[Symbol, untyped]
+  def resolve_profile(profile_name)
+    return {} if profile_name.nil?
+
+    normalized_profile_name = normalize_profile_name!(profile_name, "profile")
+    profiles = self.class.profiles
+    resolved = profiles[normalized_profile_name]
+    raise Riffer::ArgumentError, "unknown profile '#{profile_name}'" if resolved.nil?
+
+    resolved
+  end
+
+  #: (String?, Hash[Symbol, untyped]) -> String
+  def resolve_model(model_override, profile_config)
     return validate_resolved_model!(model_override) unless model_override.nil?
+    if profile_config.key?(:model)
+      profile_value = resolve_configured_value(profile_config[:model])
+      return validate_resolved_model!(profile_value)
+    end
 
     config = @model_config
     if config.is_a?(Proc)
@@ -577,17 +627,25 @@ class Riffer::Voice::Agent
     raise Riffer::ArgumentError, "model must be provided or configured via .model"
   end
 
-  #: (String?) -> String
-  def resolve_system_prompt(system_prompt_override)
+  #: (String?, Hash[Symbol, untyped]) -> String
+  def resolve_system_prompt(system_prompt_override, profile_config)
     return validate_resolved_system_prompt!(system_prompt_override) unless system_prompt_override.nil?
+    if profile_config.key?(:instructions)
+      profile_value = resolve_configured_value(profile_config[:instructions])
+      return validate_resolved_system_prompt!(profile_value)
+    end
     return validate_resolved_system_prompt!(@instructions_text) unless @instructions_text.nil?
 
     raise Riffer::ArgumentError, "system_prompt must be provided or configured via .instructions"
   end
 
-  #: (Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]?) -> Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]
-  def resolve_tools(tools_override)
+  #: (Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]?, Hash[Symbol, untyped]) -> Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]
+  def resolve_tools(tools_override, profile_config)
     return validate_resolved_tools!(tools_override) unless tools_override.nil?
+    if profile_config.key?(:tools)
+      profile_value = resolve_configured_value(profile_config[:tools])
+      return validate_resolved_tools!(profile_value)
+    end
 
     config = @tools_config
     return [] if config.nil?
@@ -599,23 +657,54 @@ class Riffer::Voice::Agent
     validate_resolved_tools!(config)
   end
 
-  #: (Hash[Symbol | String, untyped]?) -> Hash[Symbol | String, untyped]
-  def resolve_config(config_override)
-    return deep_copy(@voice_config) if config_override.nil?
+  #: (Hash[Symbol | String, untyped]?, Hash[Symbol, untyped]) -> Hash[Symbol | String, untyped]
+  def resolve_config(config_override, profile_config)
+    base_config = deep_copy(@voice_config)
+    if profile_config.key?(:voice_config)
+      profile_voice_config = profile_config[:voice_config]
+      raise Riffer::ArgumentError, "profile voice_config must be a Hash" unless profile_voice_config.is_a?(Hash)
+
+      base_config = deep_merge(base_config, deep_copy(profile_voice_config))
+    end
+    return base_config if config_override.nil?
     raise Riffer::ArgumentError, "config must be a Hash" unless config_override.is_a?(Hash)
 
-    deep_merge(deep_copy(@voice_config), config_override)
+    deep_merge(base_config, config_override)
   end
 
-  #: (Symbol?) -> Symbol
-  def resolve_runtime(runtime_override)
-    runtime = runtime_override.nil? ? @runtime_config : runtime_override
+  #: (Symbol?, Hash[Symbol, untyped]) -> Symbol
+  def resolve_runtime(runtime_override, profile_config)
+    runtime = runtime_override
+    runtime = profile_config[:runtime] if runtime.nil? && profile_config.key?(:runtime)
+    runtime = @runtime_config if runtime.nil?
     runtime = :auto if runtime.nil?
     unless Riffer::Voice::SUPPORTED_RUNTIMES.include?(runtime)
       raise Riffer::ArgumentError, "runtime must be one of: #{Riffer::Voice::SUPPORTED_RUNTIMES.join(", ")}"
     end
 
     runtime
+  end
+
+  #: (untyped) -> untyped
+  def resolve_configured_value(value)
+    return value unless value.is_a?(Proc)
+
+    (value.arity == 0) ? value.call : value.call(@tool_context)
+  end
+
+  #: (untyped, String) -> Symbol
+  def normalize_profile_name!(profile_name, argument_name)
+    case profile_name
+    when Symbol
+      profile_name
+    when String
+      stripped = profile_name.strip
+      raise Riffer::ArgumentError, "#{argument_name} must be a non-empty String or Symbol" if stripped.empty?
+
+      stripped.to_sym
+    else
+      raise Riffer::ArgumentError, "#{argument_name} must be a non-empty String or Symbol"
+    end
   end
 
   #: (untyped, String) -> void
@@ -658,6 +747,103 @@ class Riffer::Voice::Agent
     end
   end
   private_class_method :deep_copy
+
+  #: (untyped) -> Symbol
+  def self.normalize_profile_name!(name)
+    case name
+    when Symbol
+      name
+    when String
+      stripped = name.strip
+      raise Riffer::ArgumentError, "profile name must be a non-empty String or Symbol" if stripped.empty?
+
+      stripped.to_sym
+    else
+      raise Riffer::ArgumentError, "profile name must be a non-empty String or Symbol"
+    end
+  end
+  private_class_method :normalize_profile_name!
+
+  # Internal profile DSL builder.
+  class ProfileDefinition
+    #: () -> void
+    def initialize
+      @settings = {}
+    end
+
+    #: (?(String | Proc)?) -> (String | Proc)?
+    def model(model_string_or_proc = nil)
+      return @settings[:model] if model_string_or_proc.nil?
+      valid_model_value = model_string_or_proc.is_a?(String) || model_string_or_proc.is_a?(Proc)
+      raise Riffer::ArgumentError, "profile model must be a String or Proc" unless valid_model_value
+
+      @settings[:model] = model_string_or_proc
+    end
+
+    #: (?String?) -> String?
+    def instructions(instructions_text = nil)
+      return @settings[:instructions] if instructions_text.nil?
+      raise Riffer::ArgumentError, "profile instructions must be a String" unless instructions_text.is_a?(String)
+
+      @settings[:instructions] = instructions_text
+    end
+
+    #: (?(Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]] | Proc)?) -> (Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]] | Proc)?
+    def uses_tools(tools_or_lambda = nil)
+      return @settings[:tools] if tools_or_lambda.nil?
+      valid_tools_or_lambda = tools_or_lambda.is_a?(Array) || tools_or_lambda.is_a?(Proc)
+      raise Riffer::ArgumentError, "profile uses_tools must be an Array or Proc" unless valid_tools_or_lambda
+
+      @settings[:tools] = tools_or_lambda
+    end
+
+    #: (?Symbol?) -> Symbol?
+    def runtime(mode = nil)
+      return @settings[:runtime] if mode.nil?
+      unless Riffer::Voice::SUPPORTED_RUNTIMES.include?(mode)
+        raise Riffer::ArgumentError, "runtime must be one of: #{Riffer::Voice::SUPPORTED_RUNTIMES.join(", ")}"
+      end
+
+      @settings[:runtime] = mode
+    end
+
+    #: (?Hash[Symbol | String, untyped]?) -> Hash[Symbol | String, untyped]
+    def voice_config(config = nil)
+      return deep_copy(@settings[:voice_config] || {}) if config.nil?
+      raise Riffer::ArgumentError, "profile voice_config must be a Hash" unless config.is_a?(Hash)
+
+      @settings[:voice_config] = deep_copy(config)
+    end
+
+    #: (?(^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped)?) -> ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped
+    def tool_executor(executor = nil)
+      return @settings[:tool_executor] if executor.nil?
+      raise Riffer::ArgumentError, "profile tool_executor must respond to #call" unless executor.respond_to?(:call)
+
+      @settings[:tool_executor] = executor
+    end
+
+    #: () -> Hash[Symbol, untyped]
+    def to_h
+      deep_copy(@settings)
+    end
+
+    private
+
+    #: (untyped) -> untyped
+    def deep_copy(value)
+      case value
+      when Hash
+        value.each_with_object({}) do |(key, nested), result|
+          result[key] = deep_copy(nested)
+        end
+      when Array
+        value.map { |nested| deep_copy(nested) }
+      else
+        value
+      end
+    end
+  end
 
   #: () -> Hash[Symbol, Array[^(Riffer::Voice::Events::Base) -> void]]
   def default_event_callbacks

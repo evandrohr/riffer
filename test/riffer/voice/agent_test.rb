@@ -74,6 +74,54 @@ module TestSupport
         Riffer::Tools::Response.text(response_text)
       }
     end
+
+    class ProfiledVoiceAgent < Riffer::Voice::Agent
+      model VoiceModels::OPENAI_PROVIDER_MODEL
+      instructions "Base instructions"
+      uses_tools [EchoTool]
+      runtime :background
+      voice_config({
+        "temperature" => 0.2,
+        "audio" => {
+          "input" => {
+            "turn_detection" => {
+              "type" => "semantic_vad"
+            }
+          }
+        }
+      })
+
+      profile :receptionist do
+        model "openai/profile-receptionist-model"
+        instructions "Receptionist profile"
+        uses_tools [RequiredCityTool]
+        runtime :auto
+        voice_config({
+          "audio" => {
+            "input" => {
+              "turn_detection" => {
+                "create_response" => false
+              }
+            }
+          },
+          "profile_label" => "receptionist"
+        })
+      end
+
+      profile "executor_profile" do
+        tool_executor lambda { |tool_call_event:, tool_class:, arguments:, context:, agent:|
+          response_text = [
+            "profile_executor",
+            tool_call_event.name,
+            tool_class.nil? ? "nil" : tool_class.name,
+            arguments[:text],
+            context[:prefix],
+            agent.class.name
+          ].join("|")
+          Riffer::Tools::Response.text(response_text)
+        }
+      end
+    end
   end
 end
 
@@ -532,5 +580,141 @@ describe Riffer::Voice::Agent do
       )
     }.must_raise Riffer::ArgumentError
     expect(error.message).must_equal "tool_executor must respond to #call"
+  end
+
+  it "applies profile overrides for model/instructions/tools/runtime/config" do
+    profiled_agent = TestSupport::Voice::ProfiledVoiceAgent.new
+    profiled_adapter = TestSupport::Voice::FakeAdapter.new
+    profiled_agent.connect(profile: :receptionist, adapter_factory: ->(**_kwargs) { profiled_adapter })
+
+    expect(profiled_agent.session.model).must_equal "openai/profile-receptionist-model"
+    expect(profiled_agent.session.runtime).must_equal :auto
+    connect_call = profiled_adapter.connect_calls.first
+    expect(connect_call[:system_prompt]).must_equal "Receptionist profile"
+    expect(connect_call[:tools]).must_equal([TestSupport::Voice::RequiredCityTool])
+    expect(connect_call[:config]).must_equal({
+      "temperature" => 0.2,
+      "audio" => {
+        "input" => {
+          "turn_detection" => {
+            "type" => "semantic_vad",
+            "create_response" => false
+          }
+        }
+      },
+      "profile_label" => "receptionist"
+    })
+  ensure
+    profiled_agent.close unless profiled_agent.nil? || profiled_agent.closed?
+  end
+
+  it "allows explicit connect arguments to override selected profile values" do
+    profiled_agent = TestSupport::Voice::ProfiledVoiceAgent.new
+    profiled_adapter = TestSupport::Voice::FakeAdapter.new
+    profiled_agent.connect(
+      profile: :receptionist,
+      model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL,
+      system_prompt: "Explicit system prompt",
+      tools: [TestSupport::Voice::EchoTool],
+      runtime: :background,
+      config: {"temperature" => 0.9},
+      adapter_factory: ->(**_kwargs) { profiled_adapter }
+    )
+
+    expect(profiled_agent.session.model).must_equal TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL
+    expect(profiled_agent.session.runtime).must_equal :background
+    connect_call = profiled_adapter.connect_calls.first
+    expect(connect_call[:system_prompt]).must_equal "Explicit system prompt"
+    expect(connect_call[:tools]).must_equal([TestSupport::Voice::EchoTool])
+    expect(connect_call[:config]).must_equal({
+      "temperature" => 0.9,
+      "audio" => {
+        "input" => {
+          "turn_detection" => {
+            "type" => "semantic_vad",
+            "create_response" => false
+          }
+        }
+      },
+      "profile_label" => "receptionist"
+    })
+  ensure
+    profiled_agent.close unless profiled_agent.nil? || profiled_agent.closed?
+  end
+
+  it "uses profile tool_executor when selected" do
+    profiled_agent = TestSupport::Voice::ProfiledVoiceAgent.new(tool_context: {prefix: "profile_ctx"})
+    profiled_adapter = TestSupport::Voice::FakeAdapter.new
+    profiled_agent.connect(
+      profile: "executor_profile",
+      runtime: :background,
+      tools: [TestSupport::Voice::EchoTool],
+      adapter_factory: ->(**_kwargs) { profiled_adapter }
+    )
+    profiled_adapter.emit(
+      Riffer::Voice::Events::ToolCall.new(
+        call_id: "call-12",
+        name: TestSupport::Voice::EchoTool.name,
+        arguments: {"text" => "hello"}
+      )
+    )
+
+    profiled_agent.next_event(timeout: 0)
+
+    expect(profiled_adapter.tool_responses).must_equal([
+      {
+        call_id: "call-12",
+        result: "profile_executor|#{TestSupport::Voice::EchoTool.name}|#{TestSupport::Voice::EchoTool.name}|hello|profile_ctx|#{TestSupport::Voice::ProfiledVoiceAgent.name}"
+      }
+    ])
+  ensure
+    profiled_agent.close unless profiled_agent.nil? || profiled_agent.closed?
+  end
+
+  it "raises helpful errors for invalid profile selection" do
+    error = expect {
+      agent.connect(
+        profile: :missing_profile,
+        adapter_factory: ->(**_kwargs) { TestSupport::Voice::FakeAdapter.new }
+      )
+    }.must_raise Riffer::ArgumentError
+    expect(error.message).must_equal "unknown profile 'missing_profile'"
+
+    error = expect {
+      agent.connect(
+        profile: "",
+        adapter_factory: ->(**_kwargs) { TestSupport::Voice::FakeAdapter.new }
+      )
+    }.must_raise Riffer::ArgumentError
+    expect(error.message).must_equal "profile must be a non-empty String or Symbol"
+  end
+
+  it "validates profile DSL declaration inputs" do
+    error = expect {
+      Class.new(Riffer::Voice::Agent) do
+        profile 123 do
+          runtime :background
+        end
+      end
+    }.must_raise Riffer::ArgumentError
+    expect(error.message).must_equal "profile name must be a non-empty String or Symbol"
+
+    error = expect {
+      Class.new(Riffer::Voice::Agent) do
+        profile :invalid_profile do
+          runtime :bad_runtime
+        end
+      end
+    }.must_raise Riffer::ArgumentError
+    expect(error.message).must_include "runtime must be one of"
+
+    error = expect {
+      Class.new(Riffer::Voice::Agent) do
+        profile :invalid_profile do
+          voice_config "bad"
+        end
+      end
+    }.must_raise Riffer::ArgumentError
+    expect(error.message).must_equal "profile voice_config must be a Hash"
   end
 end
