@@ -84,6 +84,15 @@ class SupportVoiceAgent < Riffer::Voice::Agent
   model "openai/gpt-realtime-1.5"
   instructions "You are a concise voice assistant."
   uses_tools [LookupWeatherTool]
+  runtime :background
+  voice_config(
+    "audio" => {
+      "input" => {
+        "turn_detection" => {"type" => "semantic_vad"}
+      }
+    }
+  )
+  auto_handle_tool_calls true
 end
 
 agent = SupportVoiceAgent.connect(runtime: :auto, tool_context: {account_id: "acct_123"})
@@ -111,6 +120,22 @@ Notes:
   - `agent.next_event(auto_handle_tool_calls: false)`
   - `agent.events(auto_handle_tool_calls: false)`
 - Tool errors (unknown tool, validation, timeout, execution) are sent back through `send_tool_response`.
+
+### Voice Agent Defaults and Precedence
+
+`Riffer::Voice::Agent` supports class-level defaults:
+
+- `runtime :auto | :async | :background`
+- `voice_config({...})` (default connect config payload)
+- `auto_handle_tool_calls true | false`
+
+`connect(...)` precedence is:
+
+1. explicit method arguments
+2. class-level defaults
+3. built-in fallback (`runtime: :auto`, empty `voice_config`, auto tool handling `true`)
+
+`voice_config` is deep-merged with `connect(config: ...)`, where explicit `connect` values win.
 
 ## Validation and Error Behavior
 

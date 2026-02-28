@@ -39,6 +39,24 @@ module TestSupport
       instructions "You are helpful"
       uses_tools [EchoTool]
     end
+
+    class ConfiguredVoiceAgent < Riffer::Voice::Agent
+      model VoiceModels::OPENAI_PROVIDER_MODEL
+      instructions "Configured"
+      uses_tools [EchoTool]
+      runtime :background
+      voice_config({
+        "temperature" => 0.4,
+        "audio" => {
+          "input" => {
+            "turn_detection" => {
+              "type" => "semantic_vad"
+            }
+          }
+        }
+      })
+      auto_handle_tool_calls false
+    end
   end
 end
 
@@ -143,5 +161,165 @@ describe Riffer::Voice::Agent do
 
     expect(received).must_equal [tool_event, done_event]
     expect(adapter.tool_responses).must_equal([{call_id: "call-5", result: "voice: stream"}])
+  end
+
+  it "uses class-level runtime and config defaults when connect does not override" do
+    configured_adapter = TestSupport::Voice::FakeAdapter.new
+    configured_agent = TestSupport::Voice::ConfiguredVoiceAgent.new
+    configured_agent.connect(adapter_factory: ->(**_kwargs) { configured_adapter })
+
+    expect(configured_agent.session.runtime).must_equal :background
+    connect_call = configured_adapter.connect_calls.first
+    expect(connect_call[:config]).must_equal({
+      "temperature" => 0.4,
+      "audio" => {
+        "input" => {
+          "turn_detection" => {
+            "type" => "semantic_vad"
+          }
+        }
+      }
+    })
+  ensure
+    configured_agent.close unless configured_agent.nil? || configured_agent.closed?
+  end
+
+  it "merges connect config overrides on top of class voice_config" do
+    configured_adapter = TestSupport::Voice::FakeAdapter.new
+    configured_agent = TestSupport::Voice::ConfiguredVoiceAgent.new
+    configured_agent.connect(
+      config: {
+        "audio" => {
+          "input" => {
+            "turn_detection" => {
+              "create_response" => false
+            }
+          }
+        }
+      },
+      adapter_factory: ->(**_kwargs) { configured_adapter }
+    )
+
+    connect_call = configured_adapter.connect_calls.first
+    expect(connect_call[:config]).must_equal({
+      "temperature" => 0.4,
+      "audio" => {
+        "input" => {
+          "turn_detection" => {
+            "type" => "semantic_vad",
+            "create_response" => false
+          }
+        }
+      }
+    })
+  ensure
+    configured_agent.close unless configured_agent.nil? || configured_agent.closed?
+  end
+
+  it "prefers explicit runtime override over class runtime default" do
+    configured_adapter = TestSupport::Voice::FakeAdapter.new
+    configured_agent = TestSupport::Voice::ConfiguredVoiceAgent.new
+    configured_agent.connect(
+      runtime: :auto,
+      adapter_factory: ->(**_kwargs) { configured_adapter }
+    )
+
+    expect(configured_agent.session.runtime).must_equal :auto
+  ensure
+    configured_agent.close unless configured_agent.nil? || configured_agent.closed?
+  end
+
+  it "honors class-level auto_handle_tool_calls default" do
+    configured_adapter = TestSupport::Voice::FakeAdapter.new
+    configured_agent = TestSupport::Voice::ConfiguredVoiceAgent.new
+    configured_agent.connect(adapter_factory: ->(**_kwargs) { configured_adapter })
+    tool_event = Riffer::Voice::Events::ToolCall.new(
+      call_id: "call-6",
+      name: TestSupport::Voice::EchoTool.name,
+      arguments: {"text" => "ignored-by-default"}
+    )
+    configured_adapter.emit(tool_event)
+
+    configured_agent.next_event(timeout: 0)
+
+    expect(configured_adapter.tool_responses).must_equal []
+  ensure
+    configured_agent.close unless configured_agent.nil? || configured_agent.closed?
+  end
+
+  it "allows per-read auto_handle_tool_calls override over class-level default" do
+    configured_adapter = TestSupport::Voice::FakeAdapter.new
+    configured_agent = TestSupport::Voice::ConfiguredVoiceAgent.new(tool_context: {prefix: "voice"})
+    configured_agent.connect(adapter_factory: ->(**_kwargs) { configured_adapter })
+    tool_event = Riffer::Voice::Events::ToolCall.new(
+      call_id: "call-7",
+      name: TestSupport::Voice::EchoTool.name,
+      arguments: {"text" => "force-handle"}
+    )
+    configured_adapter.emit(tool_event)
+
+    configured_agent.next_event(timeout: 0, auto_handle_tool_calls: true)
+
+    expect(configured_adapter.tool_responses).must_equal([{call_id: "call-7", result: "voice: force-handle"}])
+  ensure
+    configured_agent.close unless configured_agent.nil? || configured_agent.closed?
+  end
+
+  it "raises helpful errors when resolved model is invalid" do
+    invalid_agent_class = Class.new(Riffer::Voice::Agent) do
+      model -> { false }
+      instructions "Hi"
+    end
+    invalid_agent = invalid_agent_class.new
+
+    error = expect {
+      invalid_agent.connect(adapter_factory: ->(**_kwargs) { TestSupport::Voice::FakeAdapter.new })
+    }.must_raise Riffer::ArgumentError
+    expect(error.message).must_equal "resolved model must be a non-empty String"
+  end
+
+  it "raises helpful errors when resolved tools is invalid" do
+    invalid_agent_class = Class.new(Riffer::Voice::Agent) do
+      model TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL
+      instructions "Hi"
+      uses_tools -> { "not-an-array" }
+    end
+    invalid_agent = invalid_agent_class.new
+
+    error = expect {
+      invalid_agent.connect(adapter_factory: ->(**_kwargs) { TestSupport::Voice::FakeAdapter.new })
+    }.must_raise Riffer::ArgumentError
+    expect(error.message).must_equal "resolved tools must be an Array"
+  end
+
+  it "validates class-level runtime DSL values" do
+    error = expect {
+      Class.new(Riffer::Voice::Agent) do
+        runtime :invalid_runtime
+      end
+    }.must_raise Riffer::ArgumentError
+
+    expect(error.message).must_include "runtime must be one of"
+  end
+
+  it "validates class-level voice_config DSL values" do
+    error = expect {
+      Class.new(Riffer::Voice::Agent) do
+        voice_config "bad"
+      end
+    }.must_raise Riffer::ArgumentError
+
+    expect(error.message).must_equal "voice_config must be a Hash"
+  end
+
+  it "validates connect config values" do
+    error = expect {
+      agent.connect(
+        config: "bad",
+        adapter_factory: ->(**_kwargs) { TestSupport::Voice::FakeAdapter.new }
+      )
+    }.must_raise Riffer::ArgumentError
+
+    expect(error.message).must_equal "config must be a Hash"
   end
 end

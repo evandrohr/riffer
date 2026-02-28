@@ -52,6 +52,44 @@ class Riffer::Voice::Agent
     @tools_config = tools_or_lambda
   end
 
+  # Gets or sets the default runtime mode used by #connect.
+  #
+  #: (?Symbol?) -> Symbol?
+  def self.runtime(mode = nil)
+    return @runtime if mode.nil?
+
+    unless Riffer::Voice::SUPPORTED_RUNTIMES.include?(mode)
+      raise Riffer::ArgumentError, "runtime must be one of: #{Riffer::Voice::SUPPORTED_RUNTIMES.join(", ")}"
+    end
+
+    @runtime = mode
+  end
+
+  # Gets or sets default connect config merged into #connect(config: ...).
+  #
+  #: (?Hash[Symbol | String, untyped]?) -> Hash[Symbol | String, untyped]
+  def self.voice_config(config = nil)
+    return deep_copy(@voice_config || {}) if config.nil?
+    raise Riffer::ArgumentError, "voice_config must be a Hash" unless config.is_a?(Hash)
+
+    @voice_config = deep_copy(config)
+  end
+
+  # Gets or sets default automatic voice tool-call handling behavior.
+  #
+  #: (?bool?) -> bool
+  def self.auto_handle_tool_calls(value = nil)
+    if value.nil?
+      return true if @auto_handle_tool_calls.nil?
+
+      return @auto_handle_tool_calls
+    end
+
+    raise Riffer::ArgumentError, "auto_handle_tool_calls must be true or false" unless value == true || value == false
+
+    @auto_handle_tool_calls = value
+  end
+
   #: (**untyped) -> Riffer::Voice::Agent
   def self.connect(**kwargs)
     tool_context = kwargs.delete(:tool_context)
@@ -63,31 +101,39 @@ class Riffer::Voice::Agent
     agent
   end
 
-  #: (?tool_context: Hash[Symbol, untyped]?, ?auto_handle_tool_calls: bool) -> void
-  def initialize(tool_context: nil, auto_handle_tool_calls: true)
+  #: (?tool_context: Hash[Symbol, untyped]?, ?auto_handle_tool_calls: bool?) -> void
+  def initialize(tool_context: nil, auto_handle_tool_calls: nil)
+    raise Riffer::ArgumentError, "tool_context must be a Hash or nil" unless tool_context.nil? || tool_context.is_a?(Hash)
+    invalid_auto_tool_calls = !auto_handle_tool_calls.nil? && auto_handle_tool_calls != true && auto_handle_tool_calls != false
+    raise Riffer::ArgumentError, "auto_handle_tool_calls must be true, false, or nil" if invalid_auto_tool_calls
+
     @tool_context = tool_context
-    @auto_handle_tool_calls = auto_handle_tool_calls
+    @auto_handle_tool_calls = auto_handle_tool_calls.nil? ? self.class.auto_handle_tool_calls : auto_handle_tool_calls
     @model_config = self.class.model
     @instructions_text = self.class.instructions
     @tools_config = self.class.uses_tools
+    @runtime_config = self.class.runtime
+    @voice_config = self.class.voice_config
     @connected_tools = [] #: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]
     @session = nil
   end
 
-  #: (?model: String?, ?system_prompt: String?, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]?, ?config: Hash[Symbol | String, untyped], ?runtime: Symbol, ?adapter_factory: ^(adapter_identifier: Symbol, model: String, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync)) -> untyped) -> self
-  def connect(model: nil, system_prompt: nil, tools: nil, config: {}, runtime: :auto, adapter_factory: nil)
+  #: (?model: String?, ?system_prompt: String?, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]?, ?config: Hash[Symbol | String, untyped]?, ?runtime: Symbol?, ?adapter_factory: ^(adapter_identifier: Symbol, model: String, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync)) -> untyped) -> self
+  def connect(model: nil, system_prompt: nil, tools: nil, config: nil, runtime: nil, adapter_factory: nil)
     close if @session && !@session.closed?
 
     resolved_model = resolve_model(model)
     resolved_system_prompt = resolve_system_prompt(system_prompt)
     resolved_tools = resolve_tools(tools)
+    resolved_config = resolve_config(config)
+    resolved_runtime = resolve_runtime(runtime)
 
     @session = Riffer::Voice.connect(
       model: resolved_model,
       system_prompt: resolved_system_prompt,
       tools: resolved_tools,
-      config: config,
-      runtime: runtime,
+      config: resolved_config,
+      runtime: resolved_runtime,
       adapter_factory: adapter_factory
     )
     @connected_tools = resolved_tools
@@ -224,37 +270,121 @@ class Riffer::Voice::Agent
 
   #: (String?) -> String
   def resolve_model(model_override)
-    return model_override if model_override
+    return validate_resolved_model!(model_override) unless model_override.nil?
 
     config = @model_config
     if config.is_a?(Proc)
-      return (config.arity == 0) ? config.call : config.call(@tool_context)
+      return validate_resolved_model!((config.arity == 0) ? config.call : config.call(@tool_context))
     end
 
-    return config if config
+    return validate_resolved_model!(config) if config
 
     raise Riffer::ArgumentError, "model must be provided or configured via .model"
   end
 
   #: (String?) -> String
   def resolve_system_prompt(system_prompt_override)
-    return system_prompt_override if system_prompt_override
-    return @instructions_text if @instructions_text
+    return validate_resolved_system_prompt!(system_prompt_override) unless system_prompt_override.nil?
+    return validate_resolved_system_prompt!(@instructions_text) unless @instructions_text.nil?
 
     raise Riffer::ArgumentError, "system_prompt must be provided or configured via .instructions"
   end
 
   #: (Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]?) -> Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]
   def resolve_tools(tools_override)
-    return tools_override if tools_override
+    return validate_resolved_tools!(tools_override) unless tools_override.nil?
 
     config = @tools_config
     return [] if config.nil?
 
     if config.is_a?(Proc)
-      return (config.arity == 0) ? config.call : config.call(@tool_context)
+      return validate_resolved_tools!((config.arity == 0) ? config.call : config.call(@tool_context))
     end
 
-    config
+    validate_resolved_tools!(config)
+  end
+
+  #: (Hash[Symbol | String, untyped]?) -> Hash[Symbol | String, untyped]
+  def resolve_config(config_override)
+    return deep_copy(@voice_config) if config_override.nil?
+    raise Riffer::ArgumentError, "config must be a Hash" unless config_override.is_a?(Hash)
+
+    deep_merge(deep_copy(@voice_config), config_override)
+  end
+
+  #: (Symbol?) -> Symbol
+  def resolve_runtime(runtime_override)
+    runtime = runtime_override.nil? ? @runtime_config : runtime_override
+    runtime = :auto if runtime.nil?
+    unless Riffer::Voice::SUPPORTED_RUNTIMES.include?(runtime)
+      raise Riffer::ArgumentError, "runtime must be one of: #{Riffer::Voice::SUPPORTED_RUNTIMES.join(", ")}"
+    end
+
+    runtime
+  end
+
+  #: (untyped) -> String
+  def validate_resolved_model!(value)
+    return value if value.is_a?(String) && !value.empty?
+
+    raise Riffer::ArgumentError, "resolved model must be a non-empty String"
+  end
+
+  #: (untyped) -> String
+  def validate_resolved_system_prompt!(value)
+    return value if value.is_a?(String) && !value.empty?
+
+    raise Riffer::ArgumentError, "resolved system_prompt must be a non-empty String"
+  end
+
+  #: (untyped) -> Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]
+  def validate_resolved_tools!(value)
+    return value if value.is_a?(Array)
+
+    raise Riffer::ArgumentError, "resolved tools must be an Array"
+  end
+
+  #: (untyped) -> untyped
+  def self.deep_copy(value)
+    case value
+    when Hash
+      value.each_with_object({}) do |(key, nested), result|
+        result[key] = deep_copy(nested)
+      end
+    when Array
+      value.map { |nested| deep_copy(nested) }
+    else
+      value
+    end
+  end
+  private_class_method :deep_copy
+
+  #: (untyped) -> untyped
+  def deep_copy(value)
+    case value
+    when Hash
+      value.each_with_object({}) do |(key, nested), result|
+        result[key] = deep_copy(nested)
+      end
+    when Array
+      value.map { |nested| deep_copy(nested) }
+    else
+      value
+    end
+  end
+
+  #: (Hash[Symbol | String, untyped], Hash[Symbol | String, untyped]) -> Hash[Symbol | String, untyped]
+  def deep_merge(base, overrides)
+    merged = deep_copy(base)
+
+    overrides.each do |key, value|
+      merged[key] = if merged[key].is_a?(Hash) && value.is_a?(Hash)
+        deep_merge(merged[key], value)
+      else
+        deep_copy(value)
+      end
+    end
+
+    merged
   end
 end
