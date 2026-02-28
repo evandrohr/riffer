@@ -57,6 +57,23 @@ module TestSupport
       })
       auto_handle_tool_calls false
     end
+
+    class ExecutorConfiguredVoiceAgent < Riffer::Voice::Agent
+      model VoiceModels::OPENAI_PROVIDER_MODEL
+      instructions "Executor configured"
+      uses_tools [EchoTool]
+      tool_executor lambda { |tool_call_event:, tool_class:, arguments:, context:, agent:|
+        response_text = [
+          "executor",
+          tool_call_event.name,
+          tool_class.nil? ? "nil" : tool_class.name,
+          arguments[:text],
+          context[:prefix],
+          agent.class.name
+        ].join("|")
+        Riffer::Tools::Response.text(response_text)
+      }
+    end
   end
 end
 
@@ -383,5 +400,137 @@ describe Riffer::Voice::Agent do
     }.must_raise Riffer::ArgumentError
 
     expect(error.message).must_equal "config must be a Hash"
+  end
+
+  it "uses custom tool_executor from initialize for automatic tool handling" do
+    custom_agent = TestSupport::Voice::SupportVoiceAgent.new(
+      tool_context: {prefix: "ctx"},
+      tool_executor: lambda { |tool_call_event:, tool_class:, arguments:, context:, agent:|
+        response_text = [
+          "custom",
+          tool_call_event.name,
+          tool_class.nil? ? "nil" : tool_class.name,
+          arguments[:text],
+          context[:prefix],
+          agent.class.name
+        ].join("|")
+        Riffer::Tools::Response.text(response_text)
+      }
+    )
+    custom_adapter = TestSupport::Voice::FakeAdapter.new
+    custom_agent.connect(runtime: :background, adapter_factory: ->(**_kwargs) { custom_adapter })
+    custom_adapter.emit(
+      Riffer::Voice::Events::ToolCall.new(
+        call_id: "call-8",
+        name: TestSupport::Voice::EchoTool.name,
+        arguments: {"text" => "hello"}
+      )
+    )
+
+    custom_agent.next_event(timeout: 0)
+
+    expect(custom_adapter.tool_responses).must_equal([
+      {
+        call_id: "call-8",
+        result: "custom|#{TestSupport::Voice::EchoTool.name}|#{TestSupport::Voice::EchoTool.name}|hello|ctx|#{TestSupport::Voice::SupportVoiceAgent.name}"
+      }
+    ])
+  ensure
+    custom_agent.close unless custom_agent.nil? || custom_agent.closed?
+  end
+
+  it "uses class-level tool_executor when one is configured" do
+    configured_agent = TestSupport::Voice::ExecutorConfiguredVoiceAgent.new(tool_context: {prefix: "class_ctx"})
+    configured_adapter = TestSupport::Voice::FakeAdapter.new
+    configured_agent.connect(runtime: :background, adapter_factory: ->(**_kwargs) { configured_adapter })
+    configured_adapter.emit(
+      Riffer::Voice::Events::ToolCall.new(
+        call_id: "call-9",
+        name: TestSupport::Voice::EchoTool.name,
+        arguments: {"text" => "hello"}
+      )
+    )
+
+    configured_agent.next_event(timeout: 0)
+
+    expect(configured_adapter.tool_responses).must_equal([
+      {
+        call_id: "call-9",
+        result: "executor|#{TestSupport::Voice::EchoTool.name}|#{TestSupport::Voice::EchoTool.name}|hello|class_ctx|#{TestSupport::Voice::ExecutorConfiguredVoiceAgent.name}"
+      }
+    ])
+  ensure
+    configured_agent.close unless configured_agent.nil? || configured_agent.closed?
+  end
+
+  it "invokes before and after tool execution hooks" do
+    hook_events = []
+    agent.on_before_tool_execution do |payload|
+      hook_events << [:before, payload[:tool_name], payload[:arguments][:text]]
+    end
+    agent.on_after_tool_execution do |payload|
+      hook_events << [:after, payload[:tool_name], payload[:result].content]
+    end
+    adapter.emit(
+      Riffer::Voice::Events::ToolCall.new(
+        call_id: "call-10",
+        name: TestSupport::Voice::EchoTool.name,
+        arguments: {"text" => "hooks"}
+      )
+    )
+
+    agent.next_event(timeout: 0)
+
+    expect(hook_events).must_equal([
+      [:before, TestSupport::Voice::EchoTool.name, "hooks"],
+      [:after, TestSupport::Voice::EchoTool.name, "voice: hooks"]
+    ])
+  end
+
+  it "invokes tool execution error hook for schema-hash declared tools without tool_executor" do
+    schema_agent = Riffer::Voice::Agent.new
+    schema_adapter = TestSupport::Voice::FakeAdapter.new
+    schema_errors = []
+    schema_agent.on_tool_execution_error do |payload|
+      schema_errors << [payload[:tool_name], payload[:result].error_type]
+    end
+    schema_agent.connect(
+      model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL,
+      system_prompt: "You are helpful",
+      tools: [{type: "function", name: "external_lookup", parameters: {type: "object", properties: {}}}],
+      runtime: :background,
+      adapter_factory: ->(**_kwargs) { schema_adapter }
+    )
+    schema_adapter.emit(
+      Riffer::Voice::Events::ToolCall.new(
+        call_id: "call-11",
+        name: "external_lookup",
+        arguments: {}
+      )
+    )
+
+    schema_agent.next_event(timeout: 0)
+
+    payload = schema_adapter.tool_responses.first[:result]
+    expect(payload).must_be_instance_of Hash
+    expect(payload.dig("error", "type")).must_equal "external_tool_executor_required"
+    expect(schema_errors).must_equal([["external_lookup", :external_tool_executor_required]])
+  ensure
+    schema_agent.close unless schema_agent.nil? || schema_agent.closed?
+  end
+
+  it "validates tool_executor input on initialize and connect" do
+    error = expect {
+      Riffer::Voice::Agent.new(tool_executor: "bad")
+    }.must_raise Riffer::ArgumentError
+    expect(error.message).must_equal "tool_executor must respond to #call"
+
+    error = expect {
+      agent.connect(
+        tool_executor: "bad",
+        adapter_factory: ->(**_kwargs) { TestSupport::Voice::FakeAdapter.new }
+      )
+    }.must_raise Riffer::ArgumentError
+    expect(error.message).must_equal "tool_executor must respond to #call"
   end
 end

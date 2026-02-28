@@ -166,6 +166,39 @@ Callback failure policy is explicit and fail-fast:
 - if any callback raises, `Riffer::Error` is raised with callback key and event class context
 - callback errors are never silently dropped
 
+### Voice Agent Tool Executor and Hooks
+
+Automatic tool handling supports a pluggable executor:
+
+- default behavior uses `Riffer::Tool#call_with_validation` for class-based tools
+- custom behavior can be injected with `tool_executor` (class-level or instance-level)
+
+```ruby
+class SupportVoiceAgent < Riffer::Voice::Agent
+  model "openai/gpt-realtime-1.5"
+  instructions "You are a concise voice assistant."
+  uses_tools [LookupWeatherTool]
+
+  tool_executor lambda { |tool_call_event:, tool_class:, arguments:, context:, agent:|
+    # custom routing logic (for example, external operation runners)
+    tool_class.new.call_with_validation(context: context, **arguments)
+  }
+end
+```
+
+Lifecycle hooks are available for automatic tool execution:
+
+- `on_before_tool_execution`
+- `on_after_tool_execution`
+- `on_tool_execution_error`
+
+Each hook receives a payload hash including tool metadata (`tool_name`, `tool_class`, `arguments`, `event`) and `result`/`error` when applicable.
+
+Schema-hash declared tools (non-`Riffer::Tool` classes) have explicit behavior:
+
+- without `tool_executor`: response error type is `external_tool_executor_required`
+- with `tool_executor`: dispatch is delegated to the custom executor
+
 ## Validation and Error Behavior
 
 `Riffer::Voice.connect(...)` validates:

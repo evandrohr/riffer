@@ -25,7 +25,7 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 | --- | --- | --- | --- | --- |
 | VA1 | API + DSL hardening | DONE | Riffer maintainers | added runtime/config/auto-tool defaults + precedence/validation coverage |
 | VA2 | Callback registry + event router | DONE | Riffer maintainers | `on_event` + typed callbacks with deterministic failure policy |
-| VA3 | Tool execution pipeline + hooks | PLANNED | Riffer maintainers | pluggable executor and hook points |
+| VA3 | Tool execution pipeline + hooks | DONE | Riffer maintainers | pluggable executor + lifecycle hooks + schema-hash behavior |
 | VA4 | Role profiles | PLANNED | Riffer maintainers | Notion-inspired role-like config bundles in core DSL |
 | VA5 | Policy gates + action budgets | PLANNED | Riffer maintainers | generic guard hooks for mutation/action control |
 | VA6 | Run helpers + lifecycle semantics | PLANNED | Riffer maintainers | `run_loop`, turn-complete helper, drain helpers |
@@ -38,8 +38,8 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 - [x] Add class-level default runtime/voice config/auto-tool settings.
 - [x] Add callback registration API for all voice event types.
 - [x] Add callback failure handling contract and tests.
-- [ ] Add custom tool executor injection contract.
-- [ ] Add before/after/on-error tool execution hooks.
+- [x] Add custom tool executor injection contract.
+- [x] Add before/after/on-error tool execution hooks.
 - [ ] Add profile DSL and profile-aware connect path.
 - [ ] Add policy hooks (approval + budget + mutation classifier interface).
 - [ ] Add helper methods for common event loops.
@@ -70,6 +70,10 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 
 | Date | Command | Result | Notes |
 | --- | --- | --- | --- |
+| 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/agent_test.rb` | Pass | VA3 executor/hooks coverage added (`25 runs, 0 failures`) |
+| 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/session_test.rb` | Pass | regression check after VA3 pipeline changes |
+| 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/connect_validation_test.rb` | Pass | connect/validation behavior preserved after VA3 |
+| 2026-02-28 | `RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake standard` | Pass | VA3 lint pass |
 | 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/agent_test.rb` | Pass | VA2 callback coverage added (`20 runs, 0 failures`) |
 | 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/session_test.rb` | Pass | regression check after VA2 callback router |
 | 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/connect_validation_test.rb` | Pass | connect/validation behavior preserved |
@@ -84,6 +88,20 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 ## Session Change Log (Newest First)
 
 ## 2026-02-28
+
+- Completed VA3 (`Tool execution pipeline + hooks`) with:
+  - pluggable `tool_executor` (class-level and instance-level injection).
+  - lifecycle hooks:
+    - `on_before_tool_execution`
+    - `on_after_tool_execution`
+    - `on_tool_execution_error`
+  - explicit schema-hash tool behavior:
+    - returns `external_tool_executor_required` when tool is schema-only and no executor is provided.
+  - expanded tests in `test/riffer/voice/agent_test.rb` for executor strategy, hook invocation, and schema-hash error behavior.
+- Updated docs:
+  - `docs/10_REALTIME_VOICE.md` (tool executor + hooks section)
+- Next step:
+  - execute VA4 from `docs/voice-agent-implementation-plan.md`.
 
 - Completed VA2 (`Callback registry + event router`) with:
   - callback registration API in `Riffer::Voice::Agent`:
