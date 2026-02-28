@@ -17,7 +17,7 @@ describe "Riffer::Voice.connect validation" do
   it "rejects legacy model prefixes" do
     expect {
       Riffer::Voice.connect(
-        model: "openai_realtime/gpt-realtime",
+        model: TestSupport::VoiceModels::OPENAI_LEGACY_PROVIDER_MODEL,
         system_prompt: "You are helpful",
         adapter_factory: ->(**_kwargs) { TestSupport::Voice::FakeAdapter.new }
       )
@@ -29,7 +29,7 @@ describe "Riffer::Voice.connect validation" do
 
     expect {
       Riffer::Voice.connect(
-        model: "openai/gpt-realtime",
+        model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL,
         system_prompt: "You are helpful",
         runtime: :background
       )
@@ -53,7 +53,7 @@ describe "Riffer::Voice.connect validation" do
     adapter = TestSupport::Voice::FakeAdapter.new
 
     session = Riffer::Voice.connect(
-      model: "openai/gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL,
       system_prompt: "You are helpful",
       adapter_factory: ->(**_kwargs) { adapter }
     )
@@ -65,7 +65,7 @@ describe "Riffer::Voice.connect validation" do
   it "rejects invalid tools entries with indexed error messages" do
     error = expect {
       Riffer::Voice.connect(
-        model: "openai/gpt-realtime",
+        model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL,
         system_prompt: "You are helpful",
         tools: [Class.new, "bad-tool-entry"],
         adapter_factory: ->(**_kwargs) { TestSupport::Voice::FakeAdapter.new }
@@ -78,7 +78,7 @@ describe "Riffer::Voice.connect validation" do
   it "rejects invalid tools schema hashes" do
     error = expect {
       Riffer::Voice.connect(
-        model: "openai/gpt-realtime",
+        model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL,
         system_prompt: "You are helpful",
         tools: [{"name" => "missing_parameters"}],
         adapter_factory: ->(**_kwargs) { TestSupport::Voice::FakeAdapter.new }
@@ -115,7 +115,7 @@ describe "Riffer::Voice.connect validation" do
     adapter = TestSupport::Voice::FakeAdapter.new
 
     session = Riffer::Voice.connect(
-      model: "openai/gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL,
       system_prompt: "You are helpful",
       tools: [openai_tool, gemini_tool],
       adapter_factory: ->(**_kwargs) { adapter }
@@ -149,7 +149,7 @@ describe "Riffer::Voice.connect validation" do
         ) do
           expect {
             Riffer::Voice.connect(
-              model: "openai/gpt-realtime",
+              model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL,
               system_prompt: "You are helpful"
             )
           }.must_raise Riffer::Error

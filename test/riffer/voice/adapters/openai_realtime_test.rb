@@ -8,7 +8,7 @@ describe Riffer::Voice::Adapters::OpenAIRealtime do
     runtime = TestSupport::Voice::RuntimeDouble.new
     driver = nil
     adapter = Riffer::Voice::Adapters::OpenAIRealtime.new(
-      model: "gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
       runtime_executor: runtime,
       driver_factory: lambda { |**kwargs|
         driver = TestSupport::Voice::DriverDouble.new(**kwargs)
@@ -24,7 +24,7 @@ describe Riffer::Voice::Adapters::OpenAIRealtime do
     )
 
     expect(connect_result).must_equal true
-    expect(driver.model).must_equal "gpt-realtime"
+    expect(driver.model).must_equal TestSupport::VoiceModels::OPENAI_MODEL
     expect(driver.connect_calls.length).must_equal 1
 
     ran = false
@@ -52,7 +52,7 @@ describe Riffer::Voice::Adapters::OpenAIRealtime do
     runtime = TestSupport::Voice::RuntimeDouble.new(kind: :background)
     driver = nil
     Riffer::Voice::Adapters::OpenAIRealtime.new(
-      model: "gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
       runtime_executor: runtime,
       driver_factory: lambda { |**kwargs|
         driver = TestSupport::Voice::DriverDouble.new(**kwargs)
@@ -85,7 +85,7 @@ describe Riffer::Voice::Adapters::OpenAIRealtime do
     runtime = Struct.new(:kind, :task).new(:async, Object.new)
     driver = nil
     Riffer::Voice::Adapters::OpenAIRealtime.new(
-      model: "gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
       runtime_executor: runtime,
       driver_factory: lambda { |**kwargs|
         driver = TestSupport::Voice::DriverDouble.new(**kwargs)

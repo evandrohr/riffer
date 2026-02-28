@@ -13,7 +13,7 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
 
     driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
       api_key: "openai-key",
-      model: "gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
       transport_factory: lambda do |url:, headers:|
         connection_args[:url] = url
         connection_args[:headers] = headers
@@ -26,11 +26,11 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
     connected = driver.connect(system_prompt: "You are helpful")
 
     expect(connected).must_equal true
-    expect(connection_args[:url]).must_include "model=gpt-realtime"
+    expect(connection_args[:url]).must_include "model=#{TestSupport::VoiceModels::OPENAI_MODEL}"
     expect(connection_args[:headers]["Authorization"]).must_equal "Bearer openai-key"
     expect(transport.writes.first["type"]).must_equal "session.update"
     expect(transport.writes.first.dig("session", "type")).must_equal "realtime"
-    expect(transport.writes.first.dig("session", "model")).must_equal "gpt-realtime"
+    expect(transport.writes.first.dig("session", "model")).must_equal TestSupport::VoiceModels::OPENAI_MODEL
     expect(transport.writes.first.dig("session", "output_modalities")).must_equal ["audio"]
     expect(transport.writes.first.dig("session", "input_audio_format")).must_be_nil
     expect(transport.writes.first.dig("session", "output_audio_format")).must_be_nil
@@ -53,7 +53,7 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
 
     driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
       api_key: "openai-key",
-      model: "gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
       transport_factory: ->(url:, headers:) { transport },
       parser: VoiceDriverTestHelpers::StubParser.new,
       task_resolver: -> { async_task }
@@ -75,7 +75,7 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
 
     driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
       api_key: "openai-key",
-      model: "gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
       transport_factory: ->(url:, headers:) { transport },
       parser: VoiceDriverTestHelpers::StubParser.new,
       task_resolver: -> { async_task }
@@ -111,7 +111,7 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
 
     driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
       api_key: "openai-key",
-      model: "gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
       transport_factory: ->(url:, headers:) { transport },
       parser: VoiceDriverTestHelpers::StubParser.new,
       task_resolver: -> { async_task }
@@ -137,7 +137,7 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
 
     driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
       api_key: "openai-key",
-      model: "gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
       transport_factory: ->(url:, headers:) { transport },
       parser: VoiceDriverTestHelpers::StubParser.new,
       task_resolver: -> { async_task }
@@ -165,7 +165,7 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
 
     driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
       api_key: "openai-key",
-      model: "gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
       transport_factory: ->(url:, headers:) { transport },
       parser: VoiceDriverTestHelpers::StubParser.new(events: [Riffer::Voice::Events::AudioChunk.new(payload: "AUDIO", mime_type: "audio/pcm")]),
       task_resolver: -> { async_task }
@@ -182,7 +182,7 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
 
     driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
       api_key: "openai-key",
-      model: "gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
       transport_factory: ->(url:, headers:) { transport },
       parser: VoiceDriverTestHelpers::StubParser.new,
       task_resolver: -> { async_task }
@@ -214,7 +214,7 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
 
     driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
       api_key: "openai-key",
-      model: "gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
       transport_factory: ->(url:, headers:) { transport },
       parser: VoiceDriverTestHelpers::StubParser.new,
       task_resolver: -> { async_task }
@@ -242,7 +242,7 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
 
     driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
       api_key: "openai-key",
-      model: "gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
       transport_factory: ->(url:, headers:) { transport },
       parser: VoiceDriverTestHelpers::StubParser.new,
       task_resolver: -> { async_task }
@@ -271,7 +271,7 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
 
     driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
       api_key: "openai-key",
-      model: "gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
       transport_factory: ->(url:, headers:) { transport },
       parser: VoiceDriverTestHelpers::StubParser.new,
       task_resolver: -> { async_task }
@@ -302,7 +302,7 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
 
     driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
       api_key: "openai-key",
-      model: "gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
       transport_factory: ->(url:, headers:) { transport },
       parser: VoiceDriverTestHelpers::StubParser.new,
       task_resolver: -> { async_task }
@@ -322,7 +322,7 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
   it "raises when no async task context is available" do
     driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
       api_key: "openai-key",
-      model: "gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
       transport_factory: ->(url:, headers:) { VoiceDriverTestHelpers::FakeTransport.new },
       parser: VoiceDriverTestHelpers::StubParser.new,
       task_resolver: -> {}
@@ -338,7 +338,7 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
 
     driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
       api_key: "openai-key",
-      model: "gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
       transport_factory: ->(url:, headers:) { transport },
       parser: VoiceDriverTestHelpers::StubParser.new,
       task_resolver: -> { async_task }
@@ -355,7 +355,7 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
   it "bounds sample rate cache growth for varied mime types" do
     driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
       api_key: "openai-key",
-      model: "gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
       transport_factory: ->(url:, headers:) { VoiceDriverTestHelpers::FakeTransport.new },
       parser: VoiceDriverTestHelpers::StubParser.new,
       task_resolver: -> { async_task }

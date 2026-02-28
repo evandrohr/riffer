@@ -7,7 +7,7 @@ describe "Riffer::Voice::Session event APIs" do
   let(:adapter) { TestSupport::Voice::FakeAdapter.new }
   let(:session) do
     Riffer::Voice.connect(
-      model: "openai/gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL,
       system_prompt: "You are helpful",
       runtime: :background,
       adapter_factory: ->(**_kwargs) { adapter }
@@ -98,7 +98,7 @@ describe "Riffer::Voice::Session event APIs" do
 
     fiber_adapter = TestSupport::Voice::FakeAdapter.new
     fiber_session = Riffer::Voice::Session.new(
-      model: "openai/gpt-realtime",
+      model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL,
       system_prompt: "You are helpful",
       tools: [],
       config: {},

@@ -21,7 +21,7 @@ describe Riffer::Voice::Session do
 
     it "returns a connected session with provided attributes" do
       session = Riffer::Voice.connect(
-        model: "openai/gpt-realtime",
+        model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL,
         system_prompt: "You are helpful",
         tools: [],
         config: {temperature: 0.2},
@@ -30,7 +30,7 @@ describe Riffer::Voice::Session do
       )
 
       expect(session).must_be_instance_of Riffer::Voice::Session
-      expect(session.model).must_equal "openai/gpt-realtime"
+      expect(session.model).must_equal TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL
       expect(session.system_prompt).must_equal "You are helpful"
       expect(session.config).must_equal({temperature: 0.2})
       expect(session.runtime).must_equal :auto
@@ -39,13 +39,13 @@ describe Riffer::Voice::Session do
       expect(session).wont_be :closed?
       expect(created_adapters.length).must_equal 1
       expect(created_adapters.first[:adapter_identifier]).must_equal :openai_realtime
-      expect(created_adapters.first[:model]).must_equal "gpt-realtime"
+      expect(created_adapters.first[:model]).must_equal TestSupport::VoiceModels::OPENAI_MODEL
       session.close
     end
 
     it "supports explicit background runtime mode" do
       session = Riffer::Voice.connect(
-        model: "openai/gpt-realtime",
+        model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL,
         system_prompt: "You are helpful",
         runtime: :background,
         adapter_factory: adapter_factory
@@ -59,7 +59,7 @@ describe Riffer::Voice::Session do
     it "requires async context for :async runtime mode" do
       expect {
         Riffer::Voice.connect(
-          model: "openai/gpt-realtime",
+          model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL,
           system_prompt: "You are helpful",
           runtime: :async
         )
@@ -72,35 +72,35 @@ describe Riffer::Voice::Session do
       }.must_raise Riffer::ArgumentError
 
       expect {
-        Riffer::Voice.connect(model: "openai/gpt-realtime", system_prompt: "", adapter_factory: adapter_factory)
+        Riffer::Voice.connect(model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL, system_prompt: "", adapter_factory: adapter_factory)
       }.must_raise Riffer::ArgumentError
     end
 
     it "validates tools and config types" do
       expect {
-        Riffer::Voice.connect(model: "openai/gpt-realtime", system_prompt: "ok", tools: :bad, adapter_factory: adapter_factory)
+        Riffer::Voice.connect(model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL, system_prompt: "ok", tools: :bad, adapter_factory: adapter_factory)
       }.must_raise Riffer::ArgumentError
 
       expect {
-        Riffer::Voice.connect(model: "openai/gpt-realtime", system_prompt: "ok", config: [], adapter_factory: adapter_factory)
+        Riffer::Voice.connect(model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL, system_prompt: "ok", config: [], adapter_factory: adapter_factory)
       }.must_raise Riffer::ArgumentError
     end
 
     it "validates runtime option" do
       expect {
-        Riffer::Voice.connect(model: "openai/gpt-realtime", system_prompt: "ok", runtime: :unknown, adapter_factory: adapter_factory)
+        Riffer::Voice.connect(model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL, system_prompt: "ok", runtime: :unknown, adapter_factory: adapter_factory)
       }.must_raise Riffer::ArgumentError
     end
 
     it "validates provider prefix in model identifier" do
       expect {
-        Riffer::Voice.connect(model: "gpt-realtime", system_prompt: "ok", adapter_factory: adapter_factory)
+        Riffer::Voice.connect(model: TestSupport::VoiceModels::OPENAI_MODEL, system_prompt: "ok", adapter_factory: adapter_factory)
       }.must_raise Riffer::ArgumentError
     end
 
     it "validates adapter_factory contract" do
       expect {
-        Riffer::Voice.connect(model: "openai/gpt-realtime", system_prompt: "ok", adapter_factory: 123)
+        Riffer::Voice.connect(model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL, system_prompt: "ok", adapter_factory: 123)
       }.must_raise Riffer::ArgumentError
     end
 
@@ -133,7 +133,7 @@ describe Riffer::Voice::Session do
 
       error = expect {
         Riffer::Voice.connect(
-          model: "openai/gpt-realtime",
+          model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL,
           system_prompt: "ok",
           adapter_factory: ->(**_kwargs) { failing_adapter }
         )
@@ -148,7 +148,7 @@ describe Riffer::Voice::Session do
     let(:adapter) { TestSupport::Voice::FakeAdapter.new }
     let(:session) do
       Riffer::Voice.connect(
-        model: "openai/gpt-realtime",
+        model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL,
         system_prompt: "You are helpful",
         adapter_factory: ->(**_kwargs) { adapter }
       )
@@ -231,7 +231,7 @@ describe Riffer::Voice::Session do
       end.new
 
       failing_session = Riffer::Voice.connect(
-        model: "openai/gpt-realtime",
+        model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL,
         system_prompt: "You are helpful",
         adapter_factory: ->(**_kwargs) { adapter_that_fails }
       )
@@ -285,7 +285,7 @@ describe Riffer::Voice::Session do
 
       error = expect {
         Riffer::Voice::Session.new(
-          model: "openai/gpt-realtime",
+          model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL,
           system_prompt: "You are helpful",
           tools: [],
           config: {},
@@ -361,7 +361,7 @@ describe Riffer::Voice::Session do
       end.new(:background)
 
       session = Riffer::Voice::Session.new(
-        model: "openai/gpt-realtime",
+        model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL,
         system_prompt: "You are helpful",
         tools: [],
         config: {},

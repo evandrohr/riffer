@@ -37,7 +37,7 @@ end
 
 Voice models must use `provider/model` format:
 
-- `openai/gpt-realtime`
+- `openai/gpt-realtime-1.5`
 - `gemini/gemini-2.5-flash-native-audio-preview-12-2025`
 
 ## Runtime Modes

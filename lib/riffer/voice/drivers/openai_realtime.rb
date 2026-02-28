@@ -9,7 +9,7 @@ require "json"
 class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
   DEFAULT_ENDPOINT = "wss://api.openai.com/v1/realtime" #: String
 
-  DEFAULT_MODEL = "gpt-realtime" #: String
+  DEFAULT_MODEL = "gpt-realtime-1.5" #: String
 
   DEFAULT_AUDIO_FORMAT_TYPE = "audio/pcm" #: String
 

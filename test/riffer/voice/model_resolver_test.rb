@@ -16,13 +16,13 @@ describe Riffer::Voice::ModelResolver do
   it "resolves openai provider/model into adapter identifier and provider model" do
     Riffer.config.openai.api_key = "test-openai-key"
 
-    resolved = Riffer::Voice::ModelResolver.resolve(model: "openai/gpt-realtime")
+    resolved = Riffer::Voice::ModelResolver.resolve(model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL)
 
     expect(resolved).must_equal(
       {
         provider: "openai",
         adapter_identifier: :openai_realtime,
-        model: "gpt-realtime"
+        model: TestSupport::VoiceModels::OPENAI_MODEL
       }
     )
   end
@@ -43,13 +43,13 @@ describe Riffer::Voice::ModelResolver do
 
   it "rejects model strings without provider/model format" do
     expect {
-      Riffer::Voice::ModelResolver.resolve(model: "gpt-realtime", validate_config: false)
+      Riffer::Voice::ModelResolver.resolve(model: TestSupport::VoiceModels::OPENAI_MODEL, validate_config: false)
     }.must_raise Riffer::ArgumentError
   end
 
   it "rejects legacy model prefixes" do
     expect {
-      Riffer::Voice::ModelResolver.resolve(model: "openai_realtime/gpt-realtime", validate_config: false)
+      Riffer::Voice::ModelResolver.resolve(model: TestSupport::VoiceModels::OPENAI_LEGACY_PROVIDER_MODEL, validate_config: false)
     }.must_raise Riffer::ArgumentError
   end
 
@@ -63,14 +63,14 @@ describe Riffer::Voice::ModelResolver do
     Riffer.config.openai.api_key = nil
 
     expect {
-      Riffer::Voice::ModelResolver.resolve(model: "openai/gpt-realtime")
+      Riffer::Voice::ModelResolver.resolve(model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL)
     }.must_raise Riffer::ArgumentError
   end
 
   it "can skip provider api key validation for injected adapter paths" do
     Riffer.config.openai.api_key = nil
 
-    resolved = Riffer::Voice::ModelResolver.resolve(model: "openai/gpt-realtime", validate_config: false)
+    resolved = Riffer::Voice::ModelResolver.resolve(model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL, validate_config: false)
     expect(resolved[:adapter_identifier]).must_equal :openai_realtime
   end
 end

@@ -4,7 +4,7 @@ Use OpenAI Realtime through the public voice session API:
 
 ```ruby
 session = Riffer::Voice.connect(
-  model: "openai/gpt-realtime",
+  model: "openai/gpt-realtime-1.5",
   system_prompt: "You are a concise voice assistant.",
   runtime: :auto
 )
@@ -40,7 +40,7 @@ OpenAI-specific connect options are passed through `config:`:
 
 ```ruby
 session = Riffer::Voice.connect(
-  model: "openai/gpt-realtime",
+  model: "openai/gpt-realtime-1.5",
   system_prompt: "You are a concise voice assistant.",
   config: {
     audio: {

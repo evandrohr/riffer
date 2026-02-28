@@ -77,7 +77,7 @@ Riffer also includes a provider-neutral realtime voice subsystem (`Riffer::Voice
 
 ```ruby
 session = Riffer::Voice.connect(
-  model: "openai/gpt-realtime",
+  model: "openai/gpt-realtime-1.5",
   system_prompt: "You are a concise voice assistant."
 )
 ```
