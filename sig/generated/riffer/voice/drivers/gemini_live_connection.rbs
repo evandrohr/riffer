@@ -1,0 +1,23 @@
+# Generated from lib/riffer/voice/drivers/gemini_live_connection.rb with RBS::Inline
+
+module Riffer::Voice::Drivers::GeminiLiveConnection
+  private
+
+  # : () -> void
+  def validate_configuration!: () -> void
+
+  # : () -> String
+  def websocket_url: () -> String
+
+  # : () -> void
+  def read_loop: () -> void
+
+  # : (untyped) -> Hash[String, untyped]?
+  def parse_frame_payload: (untyped) -> Hash[String, untyped]?
+
+  # : () -> void
+  def stop_reader_task: () -> void
+
+  # : () -> void
+  def cleanup_connection: () -> void
+end

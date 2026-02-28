@@ -1,0 +1,41 @@
+# Generated from lib/riffer/voice/parsers/openai_realtime_parser_response.rb with RBS::Inline
+
+# Response lifecycle, interrupt, and error extraction for OpenAI realtime payloads.
+module Riffer::Voice::Parsers::OpenaiRealtimeParserResponse
+  include Riffer::Voice::Parsers::OpenaiRealtimeParserConstants
+
+  private
+
+  # : (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def parse_response_done: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+
+  # : (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def parse_error: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+
+  # : (type: String) -> Array[Riffer::Voice::Events::Base]
+  def parse_interrupt: (type: String) -> Array[Riffer::Voice::Events::Base]
+
+  # : (status: String, status_details: Hash[String, untyped], response: Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def response_done_error_events: (status: String, status_details: Hash[String, untyped], response: Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+
+  # : (Hash[String, untyped]) -> Riffer::Voice::Events::Usage?
+  def usage_done_event: (Hash[String, untyped]) -> Riffer::Voice::Events::Usage?
+
+  # : (String) -> bool
+  def response_status_error?: (String) -> bool
+
+  # : (status: String, status_details: Hash[String, untyped]) -> String
+  def response_done_error_code: (status: String, status_details: Hash[String, untyped]) -> String
+
+  # : (status: String, status_details: Hash[String, untyped]) -> String
+  def response_done_error_message: (status: String, status_details: Hash[String, untyped]) -> String
+
+  # : (String) -> bool
+  def retriable_error?: (String) -> bool
+
+  # : (untyped) -> Integer?
+  def int_or_nil: (untyped) -> Integer?
+
+  # : (untyped) -> Hash[String, untyped]
+  def hash_or_empty: (untyped) -> Hash[String, untyped]
+end

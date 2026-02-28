@@ -1,0 +1,58 @@
+# Generated from lib/riffer/voice/parsers/openai_realtime_parser_constants.rb with RBS::Inline
+
+# Shared constants for OpenAI realtime payload parsing.
+module Riffer::Voice::Parsers::OpenaiRealtimeParserConstants
+  DEFAULT_AUDIO_MIME_TYPE: String
+
+  NON_ERROR_RESPONSE_STATUSES: Array[String]
+
+  INTERRUPT_TYPES: Array[String]
+
+  AUDIO_DELTA_TYPES: Array[String]
+
+  INPUT_TRANSCRIPT_DELTA_TYPES: Array[String]
+
+  INPUT_TRANSCRIPT_FINAL_TYPES: Array[String]
+
+  OUTPUT_TRANSCRIPT_DELTA_TYPES: Array[String]
+
+  OUTPUT_TRANSCRIPT_FINAL_TYPES: Array[String]
+
+  OUTPUT_ITEM_TYPES: Array[String]
+
+  CONTENT_PART_DELTA_TYPES: Array[String]
+
+  CONTENT_PART_FINAL_TYPES: Array[String]
+
+  KEYS_DELTA_PAYLOAD: Array[String]
+
+  KEYS_PART_AUDIO: Array[String]
+
+  KEYS_MIME_TYPE: Array[String]
+
+  KEYS_DELTA_TEXT: Array[String]
+
+  KEYS_TRANSCRIPT_TEXT: Array[String]
+
+  KEYS_CALL_ID: Array[String]
+
+  KEYS_ITEM_ID: Array[String]
+
+  KEYS_ERROR_CODE: Array[String]
+
+  KEYS_INPUT_TOKENS: Array[String]
+
+  KEYS_OUTPUT_TOKENS: Array[String]
+
+  KEYS_INPUT_AUDIO_TOKENS: Array[String]
+
+  KEYS_OUTPUT_AUDIO_TOKENS: Array[String]
+
+  KEYS_STATUS_DETAILS_CODE: Array[String]
+
+  AUDIO_PART_TYPES: Array[String]
+
+  TRANSCRIPT_PART_TYPES: Array[String]
+
+  RETRIABLE_ERROR_CODES: Array[String]
+end

@@ -1,0 +1,19 @@
+# Generated from lib/riffer/voice/drivers/openai_realtime_lifecycle.rb with RBS::Inline
+
+module Riffer::Voice::Drivers::OpenaiRealtimeLifecycle
+  include Riffer::Voice::Drivers::RealtimeLifecycleSupport
+
+  # : (api_key: String?, ?model: String, ?endpoint: String, ?transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, ?parser: Riffer::Voice::Parsers::OpenAIRealtimeParser, ?task_resolver: ^() -> untyped, ?response_state_lock: untyped, ?logger: untyped) -> void
+  def initialize: (api_key: String?, ?model: String, ?endpoint: String, ?transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, ?parser: Riffer::Voice::Parsers::OpenAIRealtimeParser, ?task_resolver: ^() -> untyped, ?response_state_lock: untyped, ?logger: untyped) -> void
+
+  # : (system_prompt: String, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], ?config: Hash[Symbol | String, untyped], ?callbacks: Hash[Symbol, ^(Riffer::Voice::Events::Base) -> void]) -> bool
+  def connect: (system_prompt: String, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], ?config: Hash[Symbol | String, untyped], ?callbacks: Hash[Symbol, ^(Riffer::Voice::Events::Base) -> void]) -> bool
+
+  # : (?reason: String?) -> void
+  def close: (?reason: String?) -> void
+
+  private
+
+  # : (system_prompt: String, tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], config: Hash[Symbol | String, untyped]) -> void
+  def setup_openai_transport: (system_prompt: String, tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], config: Hash[Symbol | String, untyped]) -> void
+end

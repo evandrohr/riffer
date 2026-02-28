@@ -1,0 +1,18 @@
+# Generated from lib/riffer/voice/drivers/openai_realtime_response_state.rb with RBS::Inline
+
+module Riffer::Voice::Drivers::OpenaiRealtimeResponseState
+  include Riffer::Voice::Drivers::OpenaiRealtimeResponseFlow
+
+  include Riffer::Voice::Drivers::OpenaiRealtimeResponseLogging
+
+  private
+
+  # : () -> Hash[String, untyped]
+  def response_create_payload: () -> Hash[String, untyped]
+
+  # : () -> void
+  def reset_response_tracking!: () -> void
+
+  # : () { () -> untyped } -> untyped
+  def with_response_state_lock: () { () -> untyped } -> untyped
+end

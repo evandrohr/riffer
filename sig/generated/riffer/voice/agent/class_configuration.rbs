@@ -1,0 +1,7 @@
+# Generated from lib/riffer/voice/agent/class_configuration.rb with RBS::Inline
+
+module Riffer::Voice::Agent::ClassConfiguration
+  include Riffer::Voice::Agent::ClassToolDefaults
+
+  include Riffer::Voice::Agent::ClassRuntimeProfiles
+end

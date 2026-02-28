@@ -1,0 +1,23 @@
+# Generated from lib/riffer/voice/drivers/runtime_support.rb with RBS::Inline
+
+module Riffer::Voice::Drivers::RuntimeSupport
+  private
+
+  # : () -> ^(url: String, headers: Hash[String, String]) -> untyped
+  def default_transport_factory: () -> ^(url: String, headers: Hash[String, String]) -> untyped
+
+  # : () -> ^() -> untyped
+  def default_task_resolver: () -> ^() -> untyped
+
+  # : (frame: untyped, invalid_json_code: String) -> Hash[String, untyped]?
+  def parse_json_frame_payload: (frame: untyped, invalid_json_code: String) -> Hash[String, untyped]?
+
+  # : (untyped) -> void
+  def stop_async_task: (untyped) -> void
+
+  # : (error_code: String, failure_message: String, retriable: bool) { () -> void } -> void
+  def with_driver_error_handling: (error_code: String, failure_message: String, retriable: bool) { () -> void } -> void
+
+  # : (untyped) -> String?
+  def extract_frame_payload: (untyped) -> String?
+end

@@ -1,0 +1,29 @@
+# Generated from lib/riffer/voice/drivers/gemini_live_payloads.rb with RBS::Inline
+
+module Riffer::Voice::Drivers::GeminiLivePayloads
+  private
+
+  # : (system_prompt: String, tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], config: Hash[Symbol | String, untyped]) -> Hash[String, untyped]
+  def build_setup_payload: (system_prompt: String, tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], config: Hash[Symbol | String, untyped]) -> Hash[String, untyped]
+
+  # : (Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]) -> Array[Hash[String, untyped]]
+  def normalize_gemini_tools: (Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]) -> Array[Hash[String, untyped]]
+
+  # : (Hash[Symbol | String, untyped]) -> Array[Hash[String, untyped]]
+  def expand_hash_tool_definition: (Hash[Symbol | String, untyped]) -> Array[Hash[String, untyped]]
+
+  # : (Hash[Symbol | String, untyped]) -> Hash[String, untyped]
+  def normalize_connect_config: (Hash[Symbol | String, untyped]) -> Hash[String, untyped]
+
+  # : () -> String
+  def normalized_model: () -> String
+
+  # : (Hash[String, untyped]) -> Hash[String, untyped]
+  def sanitize_tool_definition: (Hash[String, untyped]) -> Hash[String, untyped]
+
+  # : (untyped) -> untyped
+  def sanitize_schema: (untyped) -> untyped
+
+  # : (call_id: String, result: untyped) -> Hash[String, untyped]
+  def normalize_tool_response_payload: (call_id: String, result: untyped) -> Hash[String, untyped]
+end

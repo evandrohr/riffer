@@ -1,0 +1,14 @@
+# Generated from lib/riffer/voice/drivers/openai_realtime_audio.rb with RBS::Inline
+
+module Riffer::Voice::Drivers::OpenaiRealtimeAudio
+  private
+
+  # : (payload: String, mime_type: String) -> String
+  def normalize_input_audio_payload: (payload: String, mime_type: String) -> String
+
+  # : (String) -> Integer?
+  def extract_sample_rate: (String) -> Integer?
+
+  # : (String, from_rate: Integer, to_rate: Integer) -> String
+  def resample_pcm16: (String, from_rate: Integer, to_rate: Integer) -> String
+end

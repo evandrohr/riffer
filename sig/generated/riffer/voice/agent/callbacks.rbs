@@ -1,0 +1,108 @@
+# Generated from lib/riffer/voice/agent/callbacks.rb with RBS::Inline
+
+module Riffer::Voice::Agent::Callbacks
+  # Registers a callback for all durability checkpoint emissions.
+  #
+  # : () { (Hash[Symbol, untyped]) -> void } -> self
+  def on_checkpoint: () { (Hash[Symbol, untyped]) -> void } -> self
+
+  # Registers a callback for turn-complete checkpoints.
+  #
+  # : () { (Hash[Symbol, untyped]) -> void } -> self
+  def on_turn_complete_checkpoint: () { (Hash[Symbol, untyped]) -> void } -> self
+
+  # Registers a callback for tool-request checkpoints.
+  #
+  # : () { (Hash[Symbol, untyped]) -> void } -> self
+  def on_tool_request_checkpoint: () { (Hash[Symbol, untyped]) -> void } -> self
+
+  # Registers a callback for tool-response checkpoints.
+  #
+  # : () { (Hash[Symbol, untyped]) -> void } -> self
+  def on_tool_response_checkpoint: () { (Hash[Symbol, untyped]) -> void } -> self
+
+  # Registers a callback for recoverable-error checkpoints.
+  #
+  # : () { (Hash[Symbol, untyped]) -> void } -> self
+  def on_recoverable_error_checkpoint: () { (Hash[Symbol, untyped]) -> void } -> self
+
+  # Registers a callback invoked for every consumed voice event.
+  #
+  # : () { (Riffer::Voice::Events::Base) -> void } -> self
+  def on_event: () { (Riffer::Voice::Events::Base) -> void } -> self
+
+  # Registers a callback invoked for audio chunk events.
+  #
+  # : () { (Riffer::Voice::Events::AudioChunk) -> void } -> self
+  def on_audio_chunk: () { (Riffer::Voice::Events::AudioChunk) -> void } -> self
+
+  # Registers a callback invoked for input transcript events.
+  #
+  # : () { (Riffer::Voice::Events::InputTranscript) -> void } -> self
+  def on_input_transcript: () { (Riffer::Voice::Events::InputTranscript) -> void } -> self
+
+  # Registers a callback invoked for output transcript events.
+  #
+  # : () { (Riffer::Voice::Events::OutputTranscript) -> void } -> self
+  def on_output_transcript: () { (Riffer::Voice::Events::OutputTranscript) -> void } -> self
+
+  # Registers a callback invoked for tool-call events.
+  #
+  # : () { (Riffer::Voice::Events::ToolCall) -> void } -> self
+  def on_tool_call: () { (Riffer::Voice::Events::ToolCall) -> void } -> self
+
+  # Registers a callback invoked for interruption events.
+  #
+  # : () { (Riffer::Voice::Events::Interrupt) -> void } -> self
+  def on_interrupt: () { (Riffer::Voice::Events::Interrupt) -> void } -> self
+
+  # Registers a callback invoked for turn-complete events.
+  #
+  # : () { (Riffer::Voice::Events::TurnComplete) -> void } -> self
+  def on_turn_complete: () { (Riffer::Voice::Events::TurnComplete) -> void } -> self
+
+  # Registers a callback invoked for usage events.
+  #
+  # : () { (Riffer::Voice::Events::Usage) -> void } -> self
+  def on_usage: () { (Riffer::Voice::Events::Usage) -> void } -> self
+
+  # Registers a callback invoked for error events.
+  #
+  # : () { (Riffer::Voice::Events::Error) -> void } -> self
+  def on_error: () { (Riffer::Voice::Events::Error) -> void } -> self
+
+  private
+
+  # : (Symbol) { (Riffer::Voice::Events::Base) -> void } -> self
+  def register_event_callback: (Symbol) { (Riffer::Voice::Events::Base) -> void } -> self
+
+  # : (Symbol) { (Hash[Symbol, untyped]) -> void } -> self
+  def register_checkpoint_callback: (Symbol) { (Hash[Symbol, untyped]) -> void } -> self
+
+  # : (Symbol, Hash[Symbol, untyped]) -> void
+  def emit_checkpoint: (Symbol, Hash[Symbol, untyped]) -> void
+
+  # : (Symbol, Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+  def checkpoint_payload: (Symbol, Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+
+  # : (Symbol, Hash[Symbol, untyped]) -> void
+  def safely_invoke_checkpoint_callbacks: (Symbol, Hash[Symbol, untyped]) -> void
+
+  # : (Symbol) -> Symbol
+  def checkpoint_callback_key_for: (Symbol) -> Symbol
+
+  # : (Riffer::Voice::Events::Base) -> void
+  def dispatch_event_callbacks: (Riffer::Voice::Events::Base) -> void
+
+  # : (Symbol, Riffer::Voice::Events::Base) -> void
+  def safely_invoke_callbacks: (Symbol, Riffer::Voice::Events::Base) -> void
+
+  # : (Riffer::Voice::Events::Base) -> Symbol?
+  def callback_key_for: (Riffer::Voice::Events::Base) -> Symbol?
+
+  # : () -> Hash[Symbol, Array[^(Riffer::Voice::Events::Base) -> void]]
+  def default_event_callbacks: () -> Hash[Symbol, Array[^(Riffer::Voice::Events::Base) -> void]]
+
+  # : () -> Hash[Symbol, Array[^(Hash[Symbol, untyped]) -> void]]
+  def default_checkpoint_callbacks: () -> Hash[Symbol, Array[^(Hash[Symbol, untyped]) -> void]]
+end

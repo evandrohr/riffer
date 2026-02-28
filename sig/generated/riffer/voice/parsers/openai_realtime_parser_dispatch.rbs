@@ -1,0 +1,14 @@
+# Generated from lib/riffer/voice/parsers/openai_realtime_parser_dispatch.rb with RBS::Inline
+
+# Event-type routing for OpenAI realtime payloads.
+module Riffer::Voice::Parsers::OpenaiRealtimeParserDispatch
+  include Riffer::Voice::Parsers::OpenaiRealtimeParserConstants
+
+  # : (Hash[Symbol | String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def call: (Hash[Symbol | String, untyped]) -> Array[Riffer::Voice::Events::Base]
+
+  private
+
+  # : (type: String, data: Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def dispatch_event: (type: String, data: Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+end

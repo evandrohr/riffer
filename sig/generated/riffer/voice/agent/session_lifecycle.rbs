@@ -1,0 +1,38 @@
+# Generated from lib/riffer/voice/agent/session_lifecycle.rb with RBS::Inline
+
+module Riffer::Voice::Agent::SessionLifecycle
+  # : (?model: String?, ?system_prompt: String?, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]?, ?config: Hash[Symbol | String, untyped]?, ?runtime: Symbol?, ?profile: (String | Symbol)?, ?tool_executor: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped?, ?action_budget: Hash[Symbol | String, untyped]?, ?mutation_classifier: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> bool?, ?tool_policy: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped?, ?approval_callback: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent, decision: Hash[Symbol, untyped]) -> untyped?, ?adapter_factory: ^(adapter_identifier: Symbol, model: String, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync)) -> untyped) -> self
+  def connect: (?model: String?, ?system_prompt: String?, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]?, ?config: Hash[Symbol | String, untyped]?, ?runtime: Symbol?, ?profile: (String | Symbol)?, ?tool_executor: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped?, ?action_budget: Hash[Symbol | String, untyped]?, ?mutation_classifier: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> bool?, ?tool_policy: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped?, ?approval_callback: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent, decision: Hash[Symbol, untyped]) -> untyped?, ?adapter_factory: ^(adapter_identifier: Symbol, model: String, runtime_executor: Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync) -> untyped) -> self
+
+  # : () -> bool
+  def connected?: () -> bool
+
+  # : () -> bool
+  def closed?: () -> bool
+
+  # : () -> Symbol
+  def runtime_kind: () -> Symbol
+
+  # : () -> void
+  def close: () -> void
+
+  private
+
+  # : () -> void
+  def reset_existing_session!: () -> void
+
+  # : ((String | Symbol)?) -> void
+  def assign_active_profile: ((String | Symbol)?) -> void
+
+  # : (profile_config: Hash[Symbol, untyped], tool_executor: untyped, action_budget: Hash[Symbol | String, untyped]?, mutation_classifier: untyped, tool_policy: untyped, approval_callback: untyped) -> void
+  def apply_dispatch_configuration!: (profile_config: Hash[Symbol, untyped], tool_executor: untyped, action_budget: Hash[Symbol | String, untyped]?, mutation_classifier: untyped, tool_policy: untyped, approval_callback: untyped) -> void
+
+  # : (untyped, Hash[Symbol, untyped]) -> void
+  def apply_tool_executor_override: (untyped, Hash[Symbol, untyped]) -> void
+
+  # : (model: String?, system_prompt: String?, tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]?, config: Hash[Symbol | String, untyped]?, runtime: Symbol?, profile_config: Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+  def resolve_connect_payload: (model: String?, system_prompt: String?, tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]?, config: Hash[Symbol | String, untyped]?, runtime: Symbol?, profile_config: Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+
+  # : () -> Riffer::Voice::Session
+  def current_session: () -> Riffer::Voice::Session
+end

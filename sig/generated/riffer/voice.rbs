@@ -12,6 +12,30 @@ module Riffer::Voice
   # : (model: String, system_prompt: String, tools: Array[singleton(Riffer::Tool)], config: Hash[Symbol | String, untyped], runtime: Symbol, adapter_factory: untyped) -> void
   def self.validate_connect_input!: (model: String, system_prompt: String, tools: Array[singleton(Riffer::Tool)], config: Hash[Symbol | String, untyped], runtime: Symbol, adapter_factory: untyped) -> void
 
+  # : (Array[untyped]) -> void
+  def self.validate_tools!: (Array[untyped]) -> void
+
+  # : (untyped) -> bool
+  def self.tool_class?: (untyped) -> bool
+
+  # : (untyped) -> bool
+  def self.valid_tool_schema_hash?: (untyped) -> bool
+
+  # : (Hash[String, untyped]) -> bool
+  def self.valid_openai_tool_schema_hash?: (Hash[String, untyped]) -> bool
+
+  # : (Hash[String, untyped]) -> bool
+  def self.valid_gemini_tool_schema_hash?: (Hash[String, untyped]) -> bool
+
+  # : (untyped) -> bool
+  def self.valid_gemini_function_declaration?: (untyped) -> bool
+
+  # : (untyped) -> bool
+  def self.non_empty_string?: (untyped) -> bool
+
+  # : (untyped) -> untyped
+  def self.deep_stringify: (untyped) -> untyped
+
   # : (adapter_identifier: Symbol, model: String, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync), adapter_factory: untyped) -> untyped
   def self.build_adapter: (adapter_identifier: Symbol, model: String, runtime_executor: Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync, adapter_factory: untyped) -> untyped
 end

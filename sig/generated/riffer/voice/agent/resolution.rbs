@@ -1,0 +1,59 @@
+# Generated from lib/riffer/voice/agent/resolution.rb with RBS::Inline
+
+module Riffer::Voice::Agent::Resolution
+  private
+
+  # : ((String | Symbol)?) -> Hash[Symbol, untyped]
+  def resolve_profile: ((String | Symbol)?) -> Hash[Symbol, untyped]
+
+  # : (String?, Hash[Symbol, untyped]) -> String
+  def resolve_model: (String?, Hash[Symbol, untyped]) -> String
+
+  # : (String?, Hash[Symbol, untyped]) -> String
+  def resolve_system_prompt: (String?, Hash[Symbol, untyped]) -> String
+
+  # : (Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]?, Hash[Symbol, untyped]) -> Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]
+  def resolve_tools: (Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]?, Hash[Symbol, untyped]) -> Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]
+
+  # : (Hash[Symbol | String, untyped]?, Hash[Symbol, untyped]) -> Hash[Symbol | String, untyped]
+  def resolve_config: (Hash[Symbol | String, untyped]?, Hash[Symbol, untyped]) -> Hash[Symbol | String, untyped]
+
+  # : (Symbol?, Hash[Symbol, untyped]) -> Symbol
+  def resolve_runtime: (Symbol?, Hash[Symbol, untyped]) -> Symbol
+
+  # : (Hash[Symbol | String, untyped]?, Hash[Symbol, untyped]) -> Hash[Symbol, Integer?]
+  def resolve_action_budget: (Hash[Symbol | String, untyped]?, Hash[Symbol, untyped]) -> Hash[Symbol, Integer?]
+
+  # : (untyped, Hash[Symbol, untyped]) -> untyped
+  def resolve_mutation_classifier: (untyped, Hash[Symbol, untyped]) -> untyped
+
+  # : (untyped, Hash[Symbol, untyped]) -> untyped
+  def resolve_tool_policy: (untyped, Hash[Symbol, untyped]) -> untyped
+
+  # : (untyped, Hash[Symbol, untyped]) -> untyped
+  def resolve_approval_callback: (untyped, Hash[Symbol, untyped]) -> untyped
+
+  # : (untyped) -> untyped
+  def resolve_configured_value: (untyped) -> untyped
+
+  # : (untyped, String) -> Symbol
+  def normalize_profile_name!: (untyped, String) -> Symbol
+
+  # : (untyped, String) -> void
+  def validate_tool_executor!: (untyped, String) -> void
+
+  # : (untyped, String) -> void
+  def validate_callable!: (untyped, String) -> void
+
+  # : (untyped, String) -> Hash[Symbol, Integer?]
+  def validate_action_budget_config!: (untyped, String) -> Hash[Symbol, Integer?]
+
+  # : (untyped) -> String
+  def validate_resolved_model!: (untyped) -> String
+
+  # : (untyped) -> String
+  def validate_resolved_system_prompt!: (untyped) -> String
+
+  # : (untyped) -> Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]
+  def validate_resolved_tools!: (untyped) -> Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]
+end

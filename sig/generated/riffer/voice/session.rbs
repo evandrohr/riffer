@@ -5,6 +5,8 @@
 # Provides lifecycle, input contracts, and event stream/poll APIs.
 # Provider transport wiring is delegated to internal adapters.
 class Riffer::Voice::Session
+  EVENT_WAIT_POLL_INTERVAL: Float
+
   # Voice model in provider/model format.
   attr_reader model: String
 
@@ -58,9 +60,24 @@ class Riffer::Voice::Session
   # : ((Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync)) -> Symbol
   def queue_mode_for: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync) -> Symbol
 
+  # : ((Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync)) -> untyped
+  def state_lock_for: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync) -> untyped
+
   # : (Riffer::Voice::Events::Base) -> Riffer::Voice::Events::Base
   def emit_event: (Riffer::Voice::Events::Base) -> Riffer::Voice::Events::Base
 
   # : () -> void
   def ensure_open!: () -> void
+
+  # : () { (untyped) -> void } -> void
+  def with_open_adapter: () { (untyped) -> void } -> void
+
+  # : () -> void
+  def ensure_open_unlocked!: () -> void
+
+  # Lock shim for async/fiber runtime where operations share a single thread.
+  class NoopStateLock
+    # : () { () -> untyped } -> untyped
+    def synchronize: () { () -> untyped } -> untyped
+  end
 end

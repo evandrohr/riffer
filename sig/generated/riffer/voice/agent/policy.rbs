@@ -1,0 +1,49 @@
+# Generated from lib/riffer/voice/agent/policy.rb with RBS::Inline
+
+module Riffer::Voice::Agent::Policy
+  # Returns current action budget limits and counters for this connection.
+  #
+  # : () -> Hash[Symbol, Integer?]
+  def action_budget_state: () -> Hash[Symbol, Integer?]
+
+  private
+
+  # : (Hash[Symbol, untyped]) -> Riffer::Tools::Response?
+  def evaluate_dispatch_policy: (Hash[Symbol, untyped]) -> Riffer::Tools::Response?
+
+  # : (Hash[Symbol, untyped]) -> bool
+  def mutation_tool_call?: (Hash[Symbol, untyped]) -> bool
+
+  # : (mutation_call: bool) -> Riffer::Tools::Response?
+  def action_budget_error: (mutation_call: bool) -> Riffer::Tools::Response?
+
+  # : (mutation_call: bool) -> void
+  def register_tool_dispatch: (mutation_call: bool) -> void
+
+  # : (Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+  def evaluate_tool_policy_decision: (Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+
+  # : (Hash[Symbol, untyped], Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+  def resolve_approval_decision: (Hash[Symbol, untyped], Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+
+  # : (untyped) -> Hash[Symbol, untyped]
+  def normalize_policy_decision: (untyped) -> Hash[Symbol, untyped]
+
+  # : (Hash[Symbol | String, untyped]) -> Hash[Symbol, untyped]
+  def normalize_hash_policy_decision: (Hash[Symbol | String, untyped]) -> Hash[Symbol, untyped]
+
+  # : (untyped, String) -> Hash[Symbol, untyped]
+  def normalize_approval_decision: (untyped, String) -> Hash[Symbol, untyped]
+
+  # : (Symbol) -> Symbol
+  def default_policy_type_for: (Symbol) -> Symbol
+
+  # : (Symbol) -> String
+  def default_policy_message_for: (Symbol) -> String
+
+  # : (Hash[Symbol | String, untyped], Symbol) -> untyped
+  def hash_value: (Hash[Symbol | String, untyped], Symbol) -> untyped
+
+  # : (type: Symbol, message: String) -> Riffer::Tools::Response
+  def policy_error_response: (type: Symbol, message: String) -> Riffer::Tools::Response
+end

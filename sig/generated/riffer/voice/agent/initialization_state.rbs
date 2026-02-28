@@ -1,0 +1,22 @@
+# Generated from lib/riffer/voice/agent/initialization_state.rb with RBS::Inline
+
+# Internal initialization resolver for Riffer::Voice::Agent.
+class Riffer::Voice::Agent::InitializationState
+  # : (agent_class: singleton(Riffer::Voice::Agent), tool_context: Hash[Symbol, untyped]?, auto_handle_tool_calls: bool?, tool_executor: untyped, action_budget: Hash[Symbol | String, untyped]?, mutation_classifier: untyped, tool_policy: untyped, approval_callback: untyped) -> Hash[Symbol, untyped]
+  def self.build: (agent_class: singleton(Riffer::Voice::Agent), tool_context: Hash[Symbol, untyped]?, auto_handle_tool_calls: bool?, tool_executor: untyped, action_budget: Hash[Symbol | String, untyped]?, mutation_classifier: untyped, tool_policy: untyped, approval_callback: untyped) -> Hash[Symbol, untyped]
+
+  # : (Hash[Symbol, untyped]?) -> void
+  def self.validate_tool_context!: (Hash[Symbol, untyped]?) -> void
+
+  # : (bool?) -> void
+  def self.validate_auto_handle_tool_calls!: (bool?) -> void
+
+  # : (untyped, String) -> void
+  def self.validate_tool_executor!: (untyped, String) -> void
+
+  # : (untyped, String) -> void
+  def self.validate_callable!: (untyped, String) -> void
+
+  # : (singleton(Riffer::Voice::Agent), Hash[Symbol | String, untyped], String) -> Hash[Symbol, Integer?]
+  def self.validate_action_budget_config!: (singleton(Riffer::Voice::Agent), Hash[Symbol | String, untyped], String) -> Hash[Symbol, Integer?]
+end

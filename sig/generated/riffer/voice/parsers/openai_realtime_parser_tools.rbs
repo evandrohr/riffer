@@ -1,0 +1,17 @@
+# Generated from lib/riffer/voice/parsers/openai_realtime_parser_tools.rb with RBS::Inline
+
+# Tool-call extraction and argument normalization for OpenAI realtime payloads.
+module Riffer::Voice::Parsers::OpenaiRealtimeParserTools
+  include Riffer::Voice::Parsers::OpenaiRealtimeParserConstants
+
+  private
+
+  # : (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def parse_tool_call: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+
+  # : (untyped) -> Hash[String, untyped]
+  def parse_arguments: (untyped) -> Hash[String, untyped]
+
+  # : (String) -> void
+  def warn_invalid_tool_arguments: (String) -> void
+end

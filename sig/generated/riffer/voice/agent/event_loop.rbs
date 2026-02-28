@@ -1,0 +1,37 @@
+# Generated from lib/riffer/voice/agent/event_loop.rb with RBS::Inline
+
+module Riffer::Voice::Agent::EventLoop
+  include Riffer::Voice::Agent::EventLoopSupport
+
+  # : (?timeout: Numeric?, ?auto_handle_tool_calls: bool) -> Riffer::Voice::Events::Base?
+  def next_event: (?timeout: Numeric?, ?auto_handle_tool_calls: bool) -> Riffer::Voice::Events::Base?
+
+  # : (?auto_handle_tool_calls: bool) -> Enumerator[Riffer::Voice::Events::Base, void]
+  def events: (?auto_handle_tool_calls: bool) -> Enumerator[Riffer::Voice::Events::Base, void]
+
+  # Runs an event loop and yields events until a stop condition is reached.
+  #
+  # Stop conditions:
+  # - timeout reached (when timeout is provided)
+  # - no event is returned within remaining timeout
+  # - agent becomes closed/disconnected
+  # - interrupt event is received
+  #
+  # : (?timeout: Numeric?, ?auto_handle_tool_calls: bool) { (Riffer::Voice::Events::Base) -> void } -> self
+  def run_loop: (?timeout: Numeric?, ?auto_handle_tool_calls: bool) { (Riffer::Voice::Events::Base) -> void } -> self
+
+  # Sends optional input text and consumes events until turn completion or stop.
+  #
+  # : (?text: String?, ?timeout: Numeric?, ?auto_handle_tool_calls: bool) -> Array[Riffer::Voice::Events::Base]
+  def run_until_turn_complete: (?text: String?, ?timeout: Numeric?, ?auto_handle_tool_calls: bool) -> Array[Riffer::Voice::Events::Base]
+
+  # Drains currently available events without blocking.
+  #
+  # : (?max_events: Integer?, ?auto_handle_tool_calls: bool) -> Array[Riffer::Voice::Events::Base]
+  def drain_available_events: (?max_events: Integer?, ?auto_handle_tool_calls: bool) -> Array[Riffer::Voice::Events::Base]
+
+  private
+
+  # : (Riffer::Voice::Events::Base, auto_handle_tool_calls: bool) -> Riffer::Voice::Events::Base
+  def consume_event: (Riffer::Voice::Events::Base, auto_handle_tool_calls: bool) -> Riffer::Voice::Events::Base
+end

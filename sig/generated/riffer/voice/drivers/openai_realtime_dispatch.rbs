@@ -1,0 +1,12 @@
+# Generated from lib/riffer/voice/drivers/openai_realtime_dispatch.rb with RBS::Inline
+
+module Riffer::Voice::Drivers::OpenaiRealtimeDispatch
+  # : (payload: String, mime_type: String) -> void
+  def send_audio_chunk: (payload: String, mime_type: String) -> void
+
+  # : (text: String, ?role: String) -> void
+  def send_text_turn: (text: String, ?role: String) -> void
+
+  # : (call_id: String, result: untyped) -> void
+  def send_tool_response: (call_id: String, result: untyped) -> void
+end

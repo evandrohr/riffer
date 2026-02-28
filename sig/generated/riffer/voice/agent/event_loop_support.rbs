@@ -1,0 +1,26 @@
+# Generated from lib/riffer/voice/agent/event_loop_support.rb with RBS::Inline
+
+module Riffer::Voice::Agent::EventLoopSupport
+  private
+
+  # : (Numeric?) -> void
+  def validate_timeout!: (Numeric?) -> void
+
+  # : (Integer?) -> void
+  def validate_max_events!: (Integer?) -> void
+
+  # : (Numeric?) -> Float?
+  def loop_deadline: (Numeric?) -> Float?
+
+  # : (deadline: Float?, auto_handle_tool_calls: bool) -> Riffer::Voice::Events::Base?
+  def poll_loop_event: (deadline: Float?, auto_handle_tool_calls: bool) -> Riffer::Voice::Events::Base?
+
+  # : (Float?, Numeric?) -> bool
+  def timeout_reached?: (Float?, Numeric?) -> bool
+
+  # : (Riffer::Voice::Events::Base) -> bool
+  def stop_on_turn_complete?: (Riffer::Voice::Events::Base) -> bool
+
+  # : (Array[Riffer::Voice::Events::Base], Integer?) -> bool
+  def reached_event_drain_limit?: (Array[Riffer::Voice::Events::Base], Integer?) -> bool
+end

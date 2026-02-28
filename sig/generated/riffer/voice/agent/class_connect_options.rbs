@@ -1,0 +1,11 @@
+# Generated from lib/riffer/voice/agent/class_connect_options.rb with RBS::Inline
+
+# Internal option splitter used by Riffer::Voice::Agent.connect.
+class Riffer::Voice::Agent::ClassConnectOptions
+  INIT_OPTION_KEYS: untyped
+
+  ALWAYS_INCLUDED_KEYS: untyped
+
+  # : (Hash[Symbol, untyped]) -> Hash[Symbol, Hash[Symbol, untyped]]
+  def self.build: (Hash[Symbol, untyped]) -> Hash[Symbol, Hash[Symbol, untyped]]
+end

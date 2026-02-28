@@ -1,0 +1,33 @@
+# Generated from lib/riffer/voice/agent/class_runtime_profiles.rb with RBS::Inline
+
+module Riffer::Voice::Agent::ClassRuntimeProfiles
+  include Riffer::Voice::Agent::ClassConfigurationHelpers
+
+  # Gets or sets the default runtime mode used by #connect.
+  #
+  # : (?Symbol?) -> Symbol?
+  def runtime: (?Symbol?) -> Symbol?
+
+  # Gets or sets default connect config merged into #connect(config: ...).
+  #
+  # : (?Hash[Symbol | String, untyped]?) -> Hash[Symbol | String, untyped]
+  def voice_config: (?Hash[Symbol | String, untyped]?) -> Hash[Symbol | String, untyped]
+
+  # Gets or sets default automatic voice tool-call handling behavior.
+  #
+  # : (?bool?) -> bool
+  def auto_handle_tool_calls: (?bool?) -> bool
+
+  # Defines or retrieves a named profile config bundle.
+  #
+  # When called with a block, the profile is defined/updated.
+  # When called without a block, returns the stored profile hash or nil.
+  #
+  # : ((String | Symbol), ?{ () -> void }) -> Hash[Symbol, untyped]?
+  def profile: (untyped name) ?{ (?) -> untyped } -> untyped
+
+  # Returns all named profile definitions.
+  #
+  # : () -> Hash[Symbol, Hash[Symbol, untyped]]
+  def profiles: () -> Hash[Symbol, Hash[Symbol, untyped]]
+end

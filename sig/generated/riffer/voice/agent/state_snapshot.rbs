@@ -1,0 +1,30 @@
+# Generated from lib/riffer/voice/agent/state_snapshot.rb with RBS::Inline
+
+module Riffer::Voice::Agent::StateSnapshot
+  # Exports lightweight orchestration metadata for app-managed resume.
+  #
+  # : () -> Hash[Symbol, untyped]
+  def export_state_snapshot: () -> Hash[Symbol, untyped]
+
+  # Imports lightweight orchestration metadata for app-managed resume.
+  #
+  # : (snapshot: Hash[Symbol | String, untyped]) -> self
+  def import_state_snapshot: (snapshot: Hash[Symbol | String, untyped]) -> self
+
+  private
+
+  # : (Hash[String, untyped]) -> void
+  def apply_auto_handle_tool_calls_snapshot: (Hash[String, untyped]) -> void
+
+  # : (Hash[String, untyped]) -> void
+  def apply_action_budget_snapshot: (Hash[String, untyped]) -> void
+
+  # : (Hash[String, untyped]) -> void
+  def apply_tool_call_count_snapshot: (Hash[String, untyped]) -> void
+
+  # : (Hash[String, untyped]) -> void
+  def apply_mutation_tool_call_count_snapshot: (Hash[String, untyped]) -> void
+
+  # : (Hash[String, untyped]) -> void
+  def apply_active_profile_snapshot: (Hash[String, untyped]) -> void
+end

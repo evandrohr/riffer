@@ -1,0 +1,23 @@
+# Generated from lib/riffer/voice/agent/utilities.rb with RBS::Inline
+
+module Riffer::Voice::Agent::Utilities
+  private
+
+  # : () -> Float
+  def monotonic_time: () -> Float
+
+  # : (Float?) -> Numeric?
+  def remaining_timeout: (Float?) -> Numeric?
+
+  # : (untyped) -> untyped
+  def deep_copy: (untyped) -> untyped
+
+  # : (Hash[Symbol | String, untyped], Hash[Symbol | String, untyped]) -> Hash[Symbol | String, untyped]
+  def deep_merge: (Hash[Symbol | String, untyped], Hash[Symbol | String, untyped]) -> Hash[Symbol | String, untyped]
+
+  # : (untyped) -> untyped
+  def deep_stringify: (untyped) -> untyped
+
+  # : (untyped, String) -> Integer
+  def normalize_snapshot_counter!: (untyped, String) -> Integer
+end

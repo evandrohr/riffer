@@ -1,0 +1,66 @@
+# Generated from lib/riffer/voice/agent.rb with RBS::Inline
+
+# High-level orchestration wrapper for realtime voice sessions.
+#
+# Riffer::Voice::Agent keeps Riffer::Voice::Session as a low-level transport API
+# and adds optional automatic tool-call execution using Riffer::Tool classes.
+#
+#   class SupportVoiceAgent < Riffer::Voice::Agent
+#     model "openai/gpt-realtime-1.5"
+#     instructions "You are a concise support assistant."
+#     uses_tools [LookupAccountTool]
+#   end
+#
+#   agent = SupportVoiceAgent.connect(runtime: :auto)
+#   agent.send_text_turn(text: "Hello")
+#   agent.events.each do |event|
+#     puts event.class.name
+#   end
+class Riffer::Voice::Agent
+  extend Riffer::Helpers::Validations
+
+  extend Riffer::Voice::Agent::ClassConfiguration
+
+  include Riffer::Voice::Agent::Utilities
+
+  include Riffer::Voice::Agent::Callbacks
+
+  include Riffer::Voice::Agent::Policy
+
+  include Riffer::Voice::Agent::ToolExecution
+
+  include Riffer::Voice::Agent::Resolution
+
+  include Riffer::Voice::Agent::SessionLifecycle
+
+  include Riffer::Voice::Agent::StateSnapshot
+
+  include Riffer::Voice::Agent::EventLoop
+
+  # Connected voice session.
+  attr_reader session: Riffer::Voice::Session?
+
+  # Tool execution context passed to Riffer::Tool#call.
+  attr_accessor tool_context: Hash[Symbol, untyped]?
+
+  CALLBACK_KEYS: untyped
+
+  CHECKPOINT_KEYS: untyped
+
+  # : (**untyped) -> Riffer::Voice::Agent
+  def self.connect: (**untyped) -> Riffer::Voice::Agent
+
+  # : (?tool_context: Hash[Symbol, untyped]?, ?auto_handle_tool_calls: bool?, ?tool_executor: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped?, ?action_budget: Hash[Symbol | String, untyped]?, ?mutation_classifier: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> bool?, ?tool_policy: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped?, ?approval_callback: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent, decision: Hash[Symbol, untyped]) -> untyped?) -> void
+  def initialize: (?tool_context: Hash[Symbol, untyped]?, ?auto_handle_tool_calls: bool?, ?tool_executor: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped?, ?action_budget: Hash[Symbol | String, untyped]?, ?mutation_classifier: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> bool?, ?tool_policy: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped?, ?approval_callback: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent, decision: Hash[Symbol, untyped]) -> untyped?) -> void
+
+  # : (text: String) -> bool
+  def send_text_turn: (text: String) -> bool
+
+  # : (payload: String, mime_type: String) -> bool
+  def send_audio_chunk: (payload: String, mime_type: String) -> bool
+
+  # : (call_id: String, result: untyped) -> bool
+  def send_tool_response: (call_id: String, result: untyped) -> bool
+
+  private
+end

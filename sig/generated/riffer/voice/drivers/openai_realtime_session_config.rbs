@@ -1,0 +1,23 @@
+# Generated from lib/riffer/voice/drivers/openai_realtime_session_config.rb with RBS::Inline
+
+module Riffer::Voice::Drivers::OpenaiRealtimeSessionConfig
+  private
+
+  # : (system_prompt: String, tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], config: Hash[Symbol | String, untyped]) -> Hash[String, untyped]
+  def build_session_update_payload: (system_prompt: String, tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], config: Hash[Symbol | String, untyped]) -> Hash[String, untyped]
+
+  # : (session: Hash[String, untyped], config: Hash[Symbol | String, untyped]) -> Hash[String, untyped]
+  def merge_session_config: (session: Hash[String, untyped], config: Hash[Symbol | String, untyped]) -> Hash[String, untyped]
+
+  # : (Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]) -> Array[Hash[String, untyped]]
+  def normalize_openai_tools: (Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]) -> Array[Hash[String, untyped]]
+
+  # : (Hash[String, untyped]) -> Hash[String, untyped]
+  def sanitize_openai_tool: (Hash[String, untyped]) -> Hash[String, untyped]
+
+  # : (untyped) -> untyped
+  def sanitize_openai_schema_node: (untyped) -> untyped
+
+  # : (String) -> String
+  def normalize_openai_pattern: (String) -> String
+end

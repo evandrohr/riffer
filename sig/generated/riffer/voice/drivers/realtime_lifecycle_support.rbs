@@ -1,0 +1,11 @@
+# Generated from lib/riffer/voice/drivers/realtime_lifecycle_support.rb with RBS::Inline
+
+module Riffer::Voice::Drivers::RealtimeLifecycleSupport
+  private
+
+  # : (already_connected_message: String, callbacks: Hash[Symbol, ^(Riffer::Voice::Events::Base) -> void], connect_error_code: String, reader_annotation: String) { () -> void } -> bool
+  def connect_realtime!: (already_connected_message: String, callbacks: Hash[Symbol, ^(Riffer::Voice::Events::Base) -> void], connect_error_code: String, reader_annotation: String) { () -> void } -> bool
+
+  # : (close_error_code: String, reason: String?) { () -> void } -> void
+  def close_realtime!: (close_error_code: String, reason: String?) { () -> void } -> void
+end

@@ -1,0 +1,14 @@
+# Generated from lib/riffer/voice/agent/class_configuration_helpers.rb with RBS::Inline
+
+module Riffer::Voice::Agent::ClassConfigurationHelpers
+  private
+
+  # : (untyped) -> untyped
+  def deep_copy: (untyped) -> untyped
+
+  # : (untyped) -> Symbol
+  def normalize_profile_name!: (untyped) -> Symbol
+
+  # : (untyped, String) -> Hash[Symbol, Integer?]
+  def validate_action_budget_config!: (untyped, String) -> Hash[Symbol, Integer?]
+end

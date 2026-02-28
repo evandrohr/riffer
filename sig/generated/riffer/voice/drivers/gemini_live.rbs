@@ -2,6 +2,16 @@
 
 # Gemini Live realtime voice driver.
 class Riffer::Voice::Drivers::GeminiLive < Riffer::Voice::Drivers::Base
+  include Riffer::Voice::Drivers::RuntimeSupport
+
+  include Riffer::Voice::Drivers::GeminiLiveLifecycle
+
+  include Riffer::Voice::Drivers::GeminiLiveDispatch
+
+  include Riffer::Voice::Drivers::GeminiLiveConnection
+
+  include Riffer::Voice::Drivers::GeminiLivePayloads
+
   DEFAULT_ENDPOINT: String
 
   DEFAULT_AUDIO_MIME_TYPE: String
@@ -11,66 +21,4 @@ class Riffer::Voice::Drivers::GeminiLive < Riffer::Voice::Drivers::Base
   DEFAULT_RESPONSE_MODALITIES: Array[String]
 
   UNSUPPORTED_SCHEMA_KEYS: Array[String]
-
-  # : (api_key: String?, ?model: String, ?endpoint: String, ?transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, ?parser: Riffer::Voice::Parsers::GeminiLiveParser, ?task_resolver: ^() -> untyped, ?logger: untyped) -> void
-  def initialize: (api_key: String?, ?model: String, ?endpoint: String, ?transport_factory: ^(url: String, headers: Hash[String, String]) -> untyped, ?parser: Riffer::Voice::Parsers::GeminiLiveParser, ?task_resolver: ^() -> untyped, ?logger: untyped) -> void
-
-  # : (system_prompt: String, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], ?config: Hash[Symbol | String, untyped], ?callbacks: Hash[Symbol, ^(Riffer::Voice::Events::Base) -> void]) -> bool
-  def connect: (system_prompt: String, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], ?config: Hash[Symbol | String, untyped], ?callbacks: Hash[Symbol, ^(Riffer::Voice::Events::Base) -> void]) -> bool
-
-  # : (payload: String, mime_type: String) -> void
-  def send_audio_chunk: (payload: String, mime_type: String) -> void
-
-  # : (text: String, ?role: String) -> void
-  def send_text_turn: (text: String, ?role: String) -> void
-
-  # : (call_id: String, result: untyped) -> void
-  def send_tool_response: (call_id: String, result: untyped) -> void
-
-  # : (?reason: String?) -> void
-  def close: (?reason: String?) -> void
-
-  private
-
-  # : () -> void
-  def validate_configuration!: () -> void
-
-  # : () -> String
-  def websocket_url: () -> String
-
-  # : (system_prompt: String, tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], config: Hash[Symbol | String, untyped]) -> Hash[String, untyped]
-  def build_setup_payload: (system_prompt: String, tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], config: Hash[Symbol | String, untyped]) -> Hash[String, untyped]
-
-  # : (Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]) -> Array[Hash[String, untyped]]
-  def normalize_gemini_tools: (Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]) -> Array[Hash[String, untyped]]
-
-  # : (Hash[Symbol | String, untyped]) -> Array[Hash[String, untyped]]
-  def expand_hash_tool_definition: (Hash[Symbol | String, untyped]) -> Array[Hash[String, untyped]]
-
-  # : (Hash[Symbol | String, untyped]) -> Hash[String, untyped]
-  def normalize_connect_config: (Hash[Symbol | String, untyped]) -> Hash[String, untyped]
-
-  # : () -> String
-  def normalized_model: () -> String
-
-  # : (Hash[String, untyped]) -> Hash[String, untyped]
-  def sanitize_tool_definition: (Hash[String, untyped]) -> Hash[String, untyped]
-
-  # : (untyped) -> untyped
-  def sanitize_schema: (untyped) -> untyped
-
-  # : (call_id: String, result: untyped) -> Hash[String, untyped]
-  def normalize_tool_response_payload: (call_id: String, result: untyped) -> Hash[String, untyped]
-
-  # : () -> void
-  def read_loop: () -> void
-
-  # : (untyped) -> Hash[String, untyped]?
-  def parse_frame_payload: (untyped) -> Hash[String, untyped]?
-
-  # : () -> void
-  def stop_reader_task: () -> void
-
-  # : () -> void
-  def cleanup_connection: () -> void
 end

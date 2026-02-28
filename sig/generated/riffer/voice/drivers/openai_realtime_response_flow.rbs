@@ -1,0 +1,17 @@
+# Generated from lib/riffer/voice/drivers/openai_realtime_response_flow.rb with RBS::Inline
+
+module Riffer::Voice::Drivers::OpenaiRealtimeResponseFlow
+  private
+
+  # : () -> void
+  def request_response_create: () -> void
+
+  # : (Hash[String, untyped]) -> void
+  def update_response_tracking: (Hash[String, untyped]) -> void
+
+  # : (Hash[String, untyped]) -> void
+  def update_response_tracking_from_error_unlocked: (Hash[String, untyped]) -> void
+
+  # : () -> void
+  def flush_pending_response_create: () -> void
+end

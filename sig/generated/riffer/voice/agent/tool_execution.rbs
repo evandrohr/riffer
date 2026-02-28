@@ -1,0 +1,56 @@
+# Generated from lib/riffer/voice/agent/tool_execution.rb with RBS::Inline
+
+module Riffer::Voice::Agent::ToolExecution
+  # Registers a callback executed before each automatic tool execution.
+  #
+  # : () { (Hash[Symbol, untyped]) -> void } -> self
+  def on_before_tool_execution: () { (Hash[Symbol, untyped]) -> void } -> self
+
+  # Registers a callback executed after each automatic tool execution.
+  #
+  # : () { (Hash[Symbol, untyped]) -> void } -> self
+  def on_after_tool_execution: () { (Hash[Symbol, untyped]) -> void } -> self
+
+  # Registers a callback executed for automatic tool execution errors.
+  #
+  # : () { (Hash[Symbol, untyped]) -> void } -> self
+  def on_tool_execution_error: () { (Hash[Symbol, untyped]) -> void } -> self
+
+  private
+
+  # : (Riffer::Voice::Events::Base) -> void
+  def handle_tool_call_event: (Riffer::Voice::Events::Base) -> void
+
+  # : (Riffer::Voice::Events::ToolCall) -> Riffer::Tools::Response
+  def execute_tool_call: (Riffer::Voice::Events::ToolCall) -> Riffer::Tools::Response
+
+  # : (tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped]) -> Riffer::Tools::Response
+  def execute_tool_call_with_strategy: (tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped]) -> Riffer::Tools::Response
+
+  # : (untyped) -> Riffer::Tools::Response
+  def normalize_tool_executor_result: (untyped) -> Riffer::Tools::Response
+
+  # : (Riffer::Tools::Response) -> (String | Hash[String, untyped])
+  def serialize_tool_result: (Riffer::Tools::Response) -> (String | Hash[String, untyped])
+
+  # : (String) -> singleton(Riffer::Tool)?
+  def find_tool_class: (String) -> singleton(Riffer::Tool)?
+
+  # : (String) -> Hash[Symbol | String, untyped]?
+  def find_schema_tool: (String) -> Hash[Symbol | String, untyped]?
+
+  # : (Hash[String, untyped]) -> Hash[Symbol, untyped]
+  def parse_tool_arguments: (Hash[String, untyped]) -> Hash[Symbol, untyped]
+
+  # : (Hash[Symbol | String, untyped]) -> Array[String]
+  def schema_tool_names: (Hash[Symbol | String, untyped]) -> Array[String]
+
+  # : (Symbol) { (Hash[Symbol, untyped]) -> void } -> self
+  def register_tool_hook: (Symbol) { (Hash[Symbol, untyped]) -> void } -> self
+
+  # : (Array[^(Hash[Symbol, untyped]) -> void], Hash[Symbol, untyped]) -> void
+  def invoke_tool_hooks: (Array[^(Hash[Symbol, untyped]) -> void], Hash[Symbol, untyped]) -> void
+
+  # : (Hash[Symbol, untyped], Riffer::Tools::Response, Exception) -> void
+  def safely_invoke_tool_error_hooks: (Hash[Symbol, untyped], Riffer::Tools::Response, Exception) -> void
+end

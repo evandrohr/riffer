@@ -1,0 +1,41 @@
+# Generated from lib/riffer/voice/parsers/openai_realtime_parser_content.rb with RBS::Inline
+
+# Content, audio, and transcript event extraction for OpenAI realtime payloads.
+module Riffer::Voice::Parsers::OpenaiRealtimeParserContent
+  include Riffer::Voice::Parsers::OpenaiRealtimeParserConstants
+
+  private
+
+  # : (Hash[String, untyped], is_final: bool) -> Array[Riffer::Voice::Events::Base]
+  def parse_content_part: (Hash[String, untyped], is_final: bool) -> Array[Riffer::Voice::Events::Base]
+
+  # : (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def parse_audio_delta: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+
+  # : (Hash[String, untyped], is_final: bool) -> Array[Riffer::Voice::Events::Base]
+  def parse_input_transcript: (Hash[String, untyped], is_final: bool) -> Array[Riffer::Voice::Events::Base]
+
+  # : (Hash[String, untyped], is_final: bool) -> Array[Riffer::Voice::Events::Base]
+  def parse_output_transcript: (Hash[String, untyped], is_final: bool) -> Array[Riffer::Voice::Events::Base]
+
+  # : (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def parse_output_item: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+
+  # : (Hash[String, untyped], is_final: bool) -> Array[Riffer::Voice::Events::Base]
+  def parse_output_item_message: (Hash[String, untyped], is_final: bool) -> Array[Riffer::Voice::Events::Base]
+
+  # : (Array[untyped], is_final: bool) -> Array[Riffer::Voice::Events::Base]
+  def parse_message_parts: (Array[untyped], is_final: bool) -> Array[Riffer::Voice::Events::Base]
+
+  # : (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def part_audio_events: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+
+  # : (Hash[String, untyped], is_final: bool) -> Array[Riffer::Voice::Events::Base]
+  def part_transcript_events: (Hash[String, untyped], is_final: bool) -> Array[Riffer::Voice::Events::Base]
+
+  # : (payload: untyped, mime_type: untyped) -> Array[Riffer::Voice::Events::Base]
+  def audio_chunk_event: (payload: untyped, mime_type: untyped) -> Array[Riffer::Voice::Events::Base]
+
+  # : (klass: singleton(Riffer::Voice::Events::Base), text: untyped, is_final: bool, metadata_source: Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def transcript_event: (klass: singleton(Riffer::Voice::Events::Base), text: untyped, is_final: bool, metadata_source: Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+end
