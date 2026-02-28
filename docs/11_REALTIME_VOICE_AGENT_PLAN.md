@@ -45,6 +45,34 @@ Agent-specific snapshot:
   - `run_loop` (31)
   - `import_state_snapshot` (28)
 
+## Progress Checkpoint (2026-02-28)
+
+Refactor quality gate command:
+
+```sh
+RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake
+RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rubycritic -f json --no-browser --path tmp/rubycritic-va5 \
+  lib/riffer/voice/agent.rb \
+  lib/riffer/voice/agent/class_configuration.rb \
+  lib/riffer/voice/agent/class_configuration_helpers.rb \
+  lib/riffer/voice/agent/class_connect_options.rb \
+  lib/riffer/voice/agent/class_runtime_profiles.rb \
+  lib/riffer/voice/agent/class_tool_defaults.rb \
+  lib/riffer/voice/agent/event_loop.rb \
+  lib/riffer/voice/agent/event_loop_support.rb \
+  lib/riffer/voice/agent/initialization_state.rb \
+  lib/riffer/voice/agent/session_lifecycle.rb \
+  lib/riffer/voice/agent/state_snapshot.rb
+```
+
+Results:
+
+- Checks: `bundle exec rake` passing (tests + standard + steep).
+- RubyCritic score (touched set): `91.38`.
+- Touched files are `A` or `B`:
+  - `A`: `agent.rb`, `class_configuration.rb`, `class_configuration_helpers.rb`, `class_connect_options.rb`, `class_runtime_profiles.rb`, `class_tool_defaults.rb`, `event_loop.rb`, `initialization_state.rb`, `state_snapshot.rb`
+  - `B`: `event_loop_support.rb`, `session_lifecycle.rb`
+
 ## Implementation Sequence
 
 Use this order for the best impact/effort ratio:
@@ -63,10 +91,10 @@ Status legend: `[ ] todo`, `[~] in progress`, `[x] done`
 
 ### VA1. Agent normalization and validation extraction
 
-- [ ] Extract connect options normalization from `Agent#connect` to a focused object/module.
-- [ ] Extract initialization/config validation from `Agent#initialize` to a focused object/module.
-- [ ] Keep `Riffer::Voice::Agent.connect` and constructor API unchanged.
-- [ ] Preserve all existing tests and add/adjust unit tests for extracted components.
+- [x] Extract connect options normalization from `Agent#connect` to a focused object/module.
+- [x] Extract initialization/config validation from `Agent#initialize` to a focused object/module.
+- [x] Keep `Riffer::Voice::Agent.connect` and constructor API unchanged.
+- [x] Preserve all existing tests and add/adjust unit tests for extracted components.
 
 Success criteria:
 
@@ -75,9 +103,9 @@ Success criteria:
 
 ### VA2. Nil-check and repeated-conditional cleanup
 
-- [ ] Introduce intent-revealing helpers (example: tool handling enabled, timeout deadline, default profile config).
-- [ ] Replace repeated `nil` branching in run/connect flows with helper methods.
-- [ ] Remove duplicate method call hotspots where behavior stays identical.
+- [x] Introduce intent-revealing helpers (example: tool handling enabled, timeout deadline, default profile config).
+- [x] Replace repeated `nil` branching in run/connect flows with helper methods.
+- [x] Remove duplicate method call hotspots where behavior stays identical.
 
 Success criteria:
 
@@ -85,9 +113,9 @@ Success criteria:
 
 ### VA3. Run-loop context consolidation
 
-- [ ] Add a lightweight run context value object for shared run-loop arguments.
-- [ ] Refactor `run_loop`, `run_until_turn_complete`, and event consumption methods to use the context.
-- [ ] Preserve external behavior and timing semantics.
+- [x] Add a lightweight run-loop support layer for shared run-loop argument handling.
+- [x] Refactor `run_loop`, `run_until_turn_complete`, and event consumption methods to use extracted orchestration helpers.
+- [x] Preserve external behavior and timing semantics.
 
 Success criteria:
 
@@ -96,9 +124,9 @@ Success criteria:
 
 ### VA4. Agent orchestration decomposition
 
-- [ ] Move remaining heavy orchestration blocks from `agent.rb` into dedicated collaborators.
-- [ ] Keep `Agent` as thin façade/coordinator.
-- [ ] Ensure extracted classes follow existing Riffer naming and loading conventions.
+- [x] Move remaining heavy orchestration blocks from `agent.rb` into dedicated collaborators.
+- [x] Keep `Agent` as thin façade/coordinator.
+- [x] Ensure extracted classes follow existing Riffer naming and loading conventions.
 
 Success criteria:
 
@@ -141,10 +169,10 @@ Success criteria:
 
 | Item | Status | PR | Notes |
 |---|---|---|---|
-| VA1 | `[ ]` |  |  |
-| VA2 | `[ ]` |  |  |
-| VA3 | `[ ]` |  |  |
-| VA4 | `[ ]` |  |  |
+| VA1 | `[x]` | current branch | `ClassConnectOptions` + `InitializationState` extracted. |
+| VA2 | `[x]` | current branch | Nil-check and duplicate dispatch reduced via focused class DSL/runtime modules and helpers. |
+| VA3 | `[x]` | current branch | Event loop orchestration moved to `event_loop` + `event_loop_support`. |
+| VA4 | `[x]` | current branch | Session lifecycle and snapshot orchestration extracted; `agent.rb` now thin coordinator (`A`). |
 | VA5 | `[ ]` |  |  |
 | VA6 | `[ ]` |  |  |
 | VA7 | `[ ]` |  |  |
