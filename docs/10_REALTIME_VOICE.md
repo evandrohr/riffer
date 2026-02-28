@@ -294,6 +294,32 @@ Run-loop stop conditions:
 - `Interrupt` event (for `run_loop`)
 - `TurnComplete` or `Interrupt` event (for `run_until_turn_complete`)
 
+### Voice Agent Durability Hooks
+
+For app-managed durability/resume workflows, `Riffer::Voice::Agent` can emit checkpoints:
+
+- `on_turn_complete_checkpoint`
+- `on_tool_request_checkpoint`
+- `on_tool_response_checkpoint`
+- `on_recoverable_error_checkpoint`
+- `on_checkpoint` (receives all checkpoint types)
+
+Checkpoint payloads include a stable `type`, timestamp, active profile, and current budget state.
+
+```ruby
+agent.on_checkpoint do |payload|
+  puts "checkpoint=#{payload[:type]} at=#{payload[:at]}"
+end
+```
+
+Lightweight orchestration metadata can be snapshotted/restored:
+
+- `export_state_snapshot`
+- `import_state_snapshot(snapshot: ...)`
+
+This snapshot is agent-side metadata only (profile, counters, budget config, auto-tool handling flag).  
+Transport/provider connection state is intentionally not serialized.
+
 ## Validation and Error Behavior
 
 `Riffer::Voice.connect(...)` validates:

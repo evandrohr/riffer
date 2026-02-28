@@ -29,7 +29,7 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 | VA4 | Role profiles | DONE | Riffer maintainers | profile DSL + `connect(profile: ...)` with deterministic precedence |
 | VA5 | Policy gates + action budgets | DONE | Riffer maintainers | budget counters + mutation classifier + policy/approval hooks |
 | VA6 | Run helpers + lifecycle semantics | DONE | Riffer maintainers | `run_loop`, `run_until_turn_complete`, `drain_available_events` |
-| VA7 | Durability hooks | PLANNED | Riffer maintainers | checkpoint/snapshot hooks, app-managed persistence |
+| VA7 | Durability hooks | DONE | Riffer maintainers | checkpoint callbacks + snapshot export/import for app-managed resume |
 | VA8 | Docs/examples/migration guidance | PLANNED | Riffer maintainers | Session vs Voice Agent, profile/policy/durability examples |
 | VA9 | Test matrix + final QA | PLANNED | Riffer maintainers | runtime/tool/profile/policy/durability matrix and suite verification |
 
@@ -43,7 +43,7 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 - [x] Add profile DSL and profile-aware connect path.
 - [x] Add policy hooks (approval + budget + mutation classifier interface).
 - [x] Add helper methods for common event loops.
-- [ ] Add snapshot/checkpoint hooks for durability integration.
+- [x] Add snapshot/checkpoint hooks for durability integration.
 - [ ] Add migration examples from manual session loops.
 - [ ] Expand tests for async/background runtime matrix.
 - [ ] Run full quality gates and record results.
@@ -70,6 +70,10 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 
 | Date | Command | Result | Notes |
 | --- | --- | --- | --- |
+| 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/agent_test.rb` | Pass | VA7 durability coverage added (`44 runs, 0 failures`) |
+| 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/session_test.rb` | Pass | regression check after VA7 durability hooks |
+| 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/connect_validation_test.rb` | Pass | connect/validation behavior preserved after VA7 |
+| 2026-02-28 | `RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake standard` | Pass | VA7 lint pass |
 | 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/agent_test.rb` | Pass | VA6 run-helper coverage added (`40 runs, 0 failures`) |
 | 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/session_test.rb` | Pass | regression check after VA6 helper additions |
 | 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/connect_validation_test.rb` | Pass | connect/validation behavior preserved after VA6 |
@@ -100,6 +104,28 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 ## Session Change Log (Newest First)
 
 ## 2026-02-28
+
+- Completed VA7 (`Durability hooks`) with:
+  - checkpoint callback API:
+    - `on_checkpoint`
+    - `on_turn_complete_checkpoint`
+    - `on_tool_request_checkpoint`
+    - `on_tool_response_checkpoint`
+    - `on_recoverable_error_checkpoint`
+  - checkpoint emission points:
+    - turn complete consumption
+    - tool request observed
+    - tool response sent
+    - recoverable tool-execution error
+  - lightweight state snapshot API:
+    - `export_state_snapshot`
+    - `import_state_snapshot(snapshot:)`
+  - explicit snapshot validation and metadata-only contract (no transport state serialization).
+  - expanded tests in `test/riffer/voice/agent_test.rb` for checkpoint and snapshot behavior.
+- Updated docs:
+  - `docs/10_REALTIME_VOICE.md` (durability hooks and snapshot contract)
+- Next step:
+  - execute VA8 from `docs/voice-agent-implementation-plan.md`.
 
 - Completed VA6 (`Run helpers + lifecycle semantics`) with:
   - added run helpers:

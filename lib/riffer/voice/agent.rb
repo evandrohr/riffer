@@ -39,6 +39,14 @@ class Riffer::Voice::Agent
     :on_error
   ].freeze
 
+  CHECKPOINT_KEYS = [
+    :on_checkpoint,
+    :on_turn_complete_checkpoint,
+    :on_tool_request_checkpoint,
+    :on_tool_response_checkpoint,
+    :on_recoverable_error_checkpoint
+  ].freeze
+
   #: (?(String | Proc)?) -> (String | Proc)?
   def self.model(model_string_or_proc = nil)
     return @model if model_string_or_proc.nil?
@@ -233,11 +241,13 @@ class Riffer::Voice::Agent
     @voice_config = self.class.voice_config
     @connected_tools = [] #: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]
     @event_callbacks = default_event_callbacks #: Hash[Symbol, Array[^(Riffer::Voice::Events::Base) -> void]]
+    @checkpoint_callbacks = default_checkpoint_callbacks #: Hash[Symbol, Array[^(Hash[Symbol, untyped]) -> void]]
     @before_tool_execution_hooks = [] #: Array[^(Hash[Symbol, untyped]) -> void]
     @after_tool_execution_hooks = [] #: Array[^(Hash[Symbol, untyped]) -> void]
     @tool_execution_error_hooks = [] #: Array[^(Hash[Symbol, untyped]) -> void]
     @tool_call_count = 0
     @mutation_tool_call_count = 0
+    @active_profile = nil
     @session = nil
   end
 
@@ -258,6 +268,7 @@ class Riffer::Voice::Agent
   )
     close if @session && !@session.closed?
     profile_config = resolve_profile(profile)
+    @active_profile = profile.nil? ? nil : normalize_profile_name!(profile, "profile")
 
     unless tool_executor.nil?
       validate_tool_executor!(tool_executor, "tool_executor")
@@ -320,6 +331,85 @@ class Riffer::Voice::Agent
       tool_calls: @tool_call_count,
       mutation_tool_calls: @mutation_tool_call_count
     }
+  end
+
+  # Registers a callback for all durability checkpoint emissions.
+  #
+  #: () { (Hash[Symbol, untyped]) -> void } -> self
+  def on_checkpoint(&block)
+    register_checkpoint_callback(:on_checkpoint, &block)
+  end
+
+  # Registers a callback for turn-complete checkpoints.
+  #
+  #: () { (Hash[Symbol, untyped]) -> void } -> self
+  def on_turn_complete_checkpoint(&block)
+    register_checkpoint_callback(:on_turn_complete_checkpoint, &block)
+  end
+
+  # Registers a callback for tool-request checkpoints.
+  #
+  #: () { (Hash[Symbol, untyped]) -> void } -> self
+  def on_tool_request_checkpoint(&block)
+    register_checkpoint_callback(:on_tool_request_checkpoint, &block)
+  end
+
+  # Registers a callback for tool-response checkpoints.
+  #
+  #: () { (Hash[Symbol, untyped]) -> void } -> self
+  def on_tool_response_checkpoint(&block)
+    register_checkpoint_callback(:on_tool_response_checkpoint, &block)
+  end
+
+  # Registers a callback for recoverable-error checkpoints.
+  #
+  #: () { (Hash[Symbol, untyped]) -> void } -> self
+  def on_recoverable_error_checkpoint(&block)
+    register_checkpoint_callback(:on_recoverable_error_checkpoint, &block)
+  end
+
+  # Exports lightweight orchestration metadata for app-managed resume.
+  #
+  #: () -> Hash[Symbol, untyped]
+  def export_state_snapshot
+    {
+      active_profile: @active_profile,
+      auto_handle_tool_calls: @auto_handle_tool_calls,
+      action_budget: deep_copy(@action_budget),
+      tool_call_count: @tool_call_count,
+      mutation_tool_call_count: @mutation_tool_call_count
+    }
+  end
+
+  # Imports lightweight orchestration metadata for app-managed resume.
+  #
+  #: (snapshot: Hash[Symbol | String, untyped]) -> self
+  def import_state_snapshot(snapshot:)
+    raise Riffer::ArgumentError, "snapshot must be a Hash" unless snapshot.is_a?(Hash)
+
+    normalized = deep_stringify(snapshot)
+    if normalized.key?("auto_handle_tool_calls")
+      value = normalized["auto_handle_tool_calls"]
+      valid_value = value == true || value == false
+      raise Riffer::ArgumentError, "snapshot auto_handle_tool_calls must be true or false" unless valid_value
+
+      @auto_handle_tool_calls = value
+    end
+    if normalized.key?("action_budget")
+      @action_budget = validate_action_budget_config!(normalized["action_budget"], "snapshot action_budget")
+    end
+    if normalized.key?("tool_call_count")
+      @tool_call_count = normalize_snapshot_counter!(normalized["tool_call_count"], "tool_call_count")
+    end
+    if normalized.key?("mutation_tool_call_count")
+      @mutation_tool_call_count = normalize_snapshot_counter!(normalized["mutation_tool_call_count"], "mutation_tool_call_count")
+    end
+    if normalized.key?("active_profile")
+      profile_value = normalized["active_profile"]
+      @active_profile = profile_value.nil? ? nil : normalize_profile_name!(profile_value, "snapshot active_profile")
+    end
+
+    self
   end
 
   # Registers a callback invoked for every consumed voice event.
@@ -552,6 +642,7 @@ class Riffer::Voice::Agent
   def consume_event(event, auto_handle_tool_calls:)
     handle_tool_call_event(event) if auto_handle_tool_calls
     dispatch_event_callbacks(event)
+    emit_checkpoint(:turn_complete, {event: event}) if event.is_a?(Riffer::Voice::Events::TurnComplete)
     event
   end
 
@@ -559,8 +650,27 @@ class Riffer::Voice::Agent
   def handle_tool_call_event(event)
     return unless event.is_a?(Riffer::Voice::Events::ToolCall)
 
+    emit_checkpoint(:tool_request, {
+      call_id: event.call_id,
+      tool_name: event.name,
+      arguments: event.arguments_hash
+    })
     result = execute_tool_call(event)
-    current_session.send_tool_response(call_id: event.call_id, result: serialize_tool_result(result))
+    serialized_result = serialize_tool_result(result)
+    current_session.send_tool_response(call_id: event.call_id, result: serialized_result)
+    emit_checkpoint(:tool_response, {
+      call_id: event.call_id,
+      tool_name: event.name,
+      result: serialized_result
+    })
+    if result.error?
+      emit_checkpoint(:recoverable_error, {
+        call_id: event.call_id,
+        tool_name: event.name,
+        error_type: result.error_type,
+        error_message: result.error_message
+      })
+    end
   end
 
   #: (Symbol) { (Riffer::Voice::Events::Base) -> void } -> self
@@ -569,6 +679,57 @@ class Riffer::Voice::Agent
 
     @event_callbacks.fetch(callback_key) << block
     self
+  end
+
+  #: (Symbol) { (Hash[Symbol, untyped]) -> void } -> self
+  def register_checkpoint_callback(callback_key, &block)
+    raise Riffer::ArgumentError, "#{callback_key} requires a block" unless block_given?
+
+    @checkpoint_callbacks.fetch(callback_key) << block
+    self
+  end
+
+  #: (Symbol, Hash[Symbol, untyped]) -> void
+  def emit_checkpoint(checkpoint_type, payload)
+    checkpoint = checkpoint_payload(checkpoint_type, payload)
+    safely_invoke_checkpoint_callbacks(:on_checkpoint, checkpoint)
+    callback_key = checkpoint_callback_key_for(checkpoint_type)
+    safely_invoke_checkpoint_callbacks(callback_key, checkpoint)
+  end
+
+  #: (Symbol, Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+  def checkpoint_payload(checkpoint_type, payload)
+    {
+      type: checkpoint_type,
+      at: Time.now.utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
+      active_profile: @active_profile,
+      action_budget_state: action_budget_state
+    }.merge(payload)
+  end
+
+  #: (Symbol, Hash[Symbol, untyped]) -> void
+  def safely_invoke_checkpoint_callbacks(callback_key, payload)
+    @checkpoint_callbacks.fetch(callback_key).each do |callback|
+      callback.call(payload)
+    end
+  rescue => error
+    raise Riffer::Error, "#{callback_key} callback failed for checkpoint #{payload[:type]}: #{error.class}: #{error.message}"
+  end
+
+  #: (Symbol) -> Symbol
+  def checkpoint_callback_key_for(checkpoint_type)
+    case checkpoint_type
+    when :turn_complete
+      :on_turn_complete_checkpoint
+    when :tool_request
+      :on_tool_request_checkpoint
+    when :tool_response
+      :on_tool_response_checkpoint
+    when :recoverable_error
+      :on_recoverable_error_checkpoint
+    else
+      :on_checkpoint
+    end
   end
 
   #: (Riffer::Voice::Events::Base) -> void
@@ -1401,6 +1562,13 @@ class Riffer::Voice::Agent
     end
   end
 
+  #: () -> Hash[Symbol, Array[^(Hash[Symbol, untyped]) -> void]]
+  def default_checkpoint_callbacks
+    CHECKPOINT_KEYS.each_with_object({}) do |callback_key, callbacks|
+      callbacks[callback_key] = []
+    end
+  end
+
   #: (untyped) -> untyped
   def deep_copy(value)
     case value
@@ -1428,5 +1596,13 @@ class Riffer::Voice::Agent
     end
 
     merged
+  end
+
+  #: (untyped, String) -> Integer
+  def normalize_snapshot_counter!(value, field_name)
+    invalid_value = !value.is_a?(Integer) || value.negative?
+    raise Riffer::ArgumentError, "snapshot #{field_name} must be an Integer >= 0" if invalid_value
+
+    value
   end
 end

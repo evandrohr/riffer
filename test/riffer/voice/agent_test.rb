@@ -953,4 +953,91 @@ describe Riffer::Voice::Agent do
     error = expect { agent.drain_available_events(max_events: 0) }.must_raise Riffer::ArgumentError
     expect(error.message).must_equal "max_events must be nil or an Integer > 0"
   end
+
+  it "emits durability checkpoints for tool request/response and turn completion" do
+    checkpoint_events = []
+    agent.on_checkpoint { |payload| checkpoint_events << payload[:type] }
+    tool_request_payloads = []
+    agent.on_tool_request_checkpoint { |payload| tool_request_payloads << payload[:tool_name] }
+    tool_response_payloads = []
+    agent.on_tool_response_checkpoint { |payload| tool_response_payloads << payload[:tool_name] }
+    turn_complete_count = 0
+    agent.on_turn_complete_checkpoint { |_payload| turn_complete_count += 1 }
+
+    adapter.emit(
+      Riffer::Voice::Events::ToolCall.new(
+        call_id: "call-19",
+        name: TestSupport::Voice::EchoTool.name,
+        arguments: {"text" => "checkpoint"}
+      )
+    )
+    adapter.emit(Riffer::Voice::Events::TurnComplete.new)
+
+    agent.next_event(timeout: 0)
+    agent.next_event(timeout: 0)
+
+    expect(checkpoint_events).must_equal([:tool_request, :tool_response, :turn_complete])
+    expect(tool_request_payloads).must_equal([TestSupport::Voice::EchoTool.name])
+    expect(tool_response_payloads).must_equal([TestSupport::Voice::EchoTool.name])
+    expect(turn_complete_count).must_equal 1
+  end
+
+  it "emits recoverable_error checkpoint when tool execution fails" do
+    error_agent = TestSupport::Voice::SupportVoiceAgent.new(tool_policy: ->(**_kwargs) { :deny })
+    error_adapter = TestSupport::Voice::FakeAdapter.new
+    recoverable_types = []
+    error_agent.on_recoverable_error_checkpoint do |payload|
+      recoverable_types << payload[:error_type]
+    end
+    error_agent.connect(runtime: :background, adapter_factory: ->(**_kwargs) { error_adapter })
+    error_adapter.emit(
+      Riffer::Voice::Events::ToolCall.new(
+        call_id: "call-20",
+        name: TestSupport::Voice::EchoTool.name,
+        arguments: {"text" => "blocked"}
+      )
+    )
+
+    error_agent.next_event(timeout: 0)
+
+    expect(recoverable_types).must_equal([:policy_denied])
+  ensure
+    error_agent.close unless error_agent.nil? || error_agent.closed?
+  end
+
+  it "exports and imports lightweight state snapshot for app-managed resume" do
+    snapshot_agent = TestSupport::Voice::ProfiledVoiceAgent.new
+    snapshot_adapter = TestSupport::Voice::FakeAdapter.new
+    snapshot_agent.connect(profile: :receptionist, adapter_factory: ->(**_kwargs) { snapshot_adapter })
+    snapshot = snapshot_agent.export_state_snapshot
+
+    expect(snapshot[:active_profile]).must_equal :receptionist
+    expect(snapshot[:auto_handle_tool_calls]).must_equal true
+    expect(snapshot[:action_budget]).must_equal({max_tool_calls: 1})
+
+    imported_agent = TestSupport::Voice::SupportVoiceAgent.new
+    imported_agent.import_state_snapshot(snapshot: snapshot)
+    imported_state = imported_agent.action_budget_state
+
+    expect(imported_state).must_equal({
+      max_tool_calls: 1,
+      max_mutation_calls: nil,
+      tool_calls: 0,
+      mutation_tool_calls: 0
+    })
+  ensure
+    snapshot_agent.close unless snapshot_agent.nil? || snapshot_agent.closed?
+  end
+
+  it "validates snapshot import payloads" do
+    error = expect {
+      agent.import_state_snapshot(snapshot: "bad")
+    }.must_raise Riffer::ArgumentError
+    expect(error.message).must_equal "snapshot must be a Hash"
+
+    error = expect {
+      agent.import_state_snapshot(snapshot: {"tool_call_count" => -1})
+    }.must_raise Riffer::ArgumentError
+    expect(error.message).must_equal "snapshot tool_call_count must be an Integer >= 0"
+  end
 end
