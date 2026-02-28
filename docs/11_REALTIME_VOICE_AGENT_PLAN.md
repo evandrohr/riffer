@@ -107,6 +107,29 @@ Results:
   - `A`: `gemini_live.rb`, `gemini_live_dispatch.rb`, `openai_realtime.rb`, `openai_realtime_dispatch.rb`, `openai_realtime_response_logging.rb`, `openai_realtime_response_state.rb`, `realtime_lifecycle_support.rb`, `runtime_support.rb`
   - `B`: `base.rb`, `gemini_live_connection.rb`, `gemini_live_lifecycle.rb`, `gemini_live_payloads.rb`, `openai_realtime_audio.rb`, `openai_realtime_connection.rb`, `openai_realtime_lifecycle.rb`, `openai_realtime_response_flow.rb`, `openai_realtime_session_config.rb`
 
+## Progress Checkpoint (2026-02-28, VA6)
+
+Refactor quality gate command:
+
+```sh
+RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake
+bundle exec rubycritic -f json --no-browser --path tmp/rubycritic-va6 \
+  lib/riffer/voice/parsers/openai_realtime_parser.rb \
+  lib/riffer/voice/parsers/openai_realtime_parser_constants.rb \
+  lib/riffer/voice/parsers/openai_realtime_parser_dispatch.rb \
+  lib/riffer/voice/parsers/openai_realtime_parser_content.rb \
+  lib/riffer/voice/parsers/openai_realtime_parser_response.rb \
+  lib/riffer/voice/parsers/openai_realtime_parser_tools.rb
+```
+
+Results:
+
+- Checks: `bundle exec rake` passing (tests + standard + steep).
+- RubyCritic score (touched set): `90.52`.
+- Touched parser files are `A` or `B`:
+  - `A`: `openai_realtime_parser.rb`, `openai_realtime_parser_constants.rb`, `openai_realtime_parser_dispatch.rb`, `openai_realtime_parser_tools.rb`
+  - `B`: `openai_realtime_parser_content.rb`, `openai_realtime_parser_response.rb`
+
 ## Implementation Sequence
 
 Use this order for the best impact/effort ratio:
@@ -180,9 +203,9 @@ Success criteria:
 
 ### VA6. OpenAI parser split
 
-- [ ] Split OpenAI realtime parser into event-specific handlers or dispatch table structure.
-- [ ] Keep parser public contract unchanged.
-- [ ] Add tests at handler boundaries where useful.
+- [x] Split OpenAI realtime parser into event-specific handlers or dispatch table structure.
+- [x] Keep parser public contract unchanged.
+- [x] Add tests at handler boundaries where useful.
 
 Success criteria:
 
@@ -208,7 +231,7 @@ Success criteria:
 | VA3 | `[x]` | current branch | Event loop orchestration moved to `event_loop` + `event_loop_support`. |
 | VA4 | `[x]` | current branch | Session lifecycle and snapshot orchestration extracted; `agent.rb` now thin coordinator (`A`). |
 | VA5 | `[x]` | current branch | Shared runtime/lifecycle helpers + split OpenAI/Gemini driver concerns into focused modules. |
-| VA6 | `[ ]` |  |  |
+| VA6 | `[x]` | current branch | OpenAI realtime parser split into dispatch/constants/content/response/tools modules, preserving parser API and tests. |
 | VA7 | `[ ]` |  |  |
 
 ## Definition Of Done

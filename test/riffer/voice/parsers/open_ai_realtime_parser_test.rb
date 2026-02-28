@@ -181,6 +181,22 @@ describe Riffer::Voice::Parsers::OpenAIRealtimeParser do
     expect(events.first.payload).must_equal "BASE64_AUDIO"
   end
 
+  it "parses final transcript from response.content_part.done" do
+    events = parser.call(
+      {
+        "type" => "response.content_part.done",
+        "part" => {
+          "type" => "text",
+          "text" => "Final sentence"
+        }
+      }
+    )
+
+    expect(events.map(&:class)).must_equal([Riffer::Voice::Events::OutputTranscript])
+    expect(events.first.text).must_equal "Final sentence"
+    expect(events.first.is_final).must_equal true
+  end
+
   it "parses response done with usage and turn complete" do
     events = parser.call(
       {
@@ -255,5 +271,11 @@ describe Riffer::Voice::Parsers::OpenAIRealtimeParser do
     events = parser.call({"type" => "input_audio_buffer.speech_started"})
 
     expect(events.first).must_be_instance_of Riffer::Voice::Events::Interrupt
+  end
+
+  it "returns no events for unsupported payload types" do
+    events = parser.call({"type" => "response.unknown"})
+
+    expect(events).must_equal([])
   end
 end
