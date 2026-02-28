@@ -88,6 +88,16 @@ bundle exec rake standard
 bundle exec rake standard:fix
 ```
 
+Run RubyCritic code quality report:
+
+```bash
+# one-time install
+bundle add rubycritic --group development
+
+# generate report at tmp/rubycritic/index.html
+bundle exec rake rubycritic
+```
+
 Run the interactive console:
 
 ```bash

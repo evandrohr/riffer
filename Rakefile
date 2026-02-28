@@ -2,6 +2,7 @@
 
 require "bundler/gem_tasks"
 require "minitest/test_task"
+require "shellwords"
 
 Minitest::TestTask.create
 
@@ -22,6 +23,23 @@ RDoc::Task.new do |rdoc|
 end
 
 task docs: :rdoc
+
+namespace :quality do
+  desc "Run RubyCritic report for lib/ (output: tmp/rubycritic)"
+  task :rubycritic do
+    unless Gem::Specification.find_all_by_name("rubycritic").any?
+      abort "rubycritic gem is not installed. Install it with: bundle add rubycritic --group development"
+    end
+
+    output_path = ENV.fetch("RUBYCRITIC_OUTPUT", "tmp/rubycritic")
+    target = ENV.fetch("RUBYCRITIC_TARGET", "lib")
+
+    sh "RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rubycritic --no-browser --path #{Shellwords.escape(output_path)} #{Shellwords.escape(target)}"
+  end
+end
+
+desc "Run RubyCritic quality report"
+task rubycritic: "quality:rubycritic"
 
 namespace :rbs do
   desc "Generate RBS type signatures from inline annotations"
