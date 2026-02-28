@@ -96,6 +96,7 @@ module TestSupport
         instructions "Receptionist profile"
         uses_tools [RequiredCityTool]
         runtime :auto
+        action_budget max_tool_calls: 1
         voice_config({
           "audio" => {
             "input" => {
@@ -604,6 +605,7 @@ describe Riffer::Voice::Agent do
       },
       "profile_label" => "receptionist"
     })
+    expect(profiled_agent.action_budget_state[:max_tool_calls]).must_equal 1
   ensure
     profiled_agent.close unless profiled_agent.nil? || profiled_agent.closed?
   end
@@ -716,5 +718,174 @@ describe Riffer::Voice::Agent do
       end
     }.must_raise Riffer::ArgumentError
     expect(error.message).must_equal "profile voice_config must be a Hash"
+  end
+
+  it "enforces max_tool_calls action budget with typed policy error" do
+    budget_agent = TestSupport::Voice::SupportVoiceAgent.new(
+      tool_context: {prefix: "voice"},
+      action_budget: {max_tool_calls: 1}
+    )
+    budget_adapter = TestSupport::Voice::FakeAdapter.new
+    budget_agent.connect(runtime: :background, adapter_factory: ->(**_kwargs) { budget_adapter })
+    budget_adapter.emit(
+      Riffer::Voice::Events::ToolCall.new(
+        call_id: "call-13",
+        name: TestSupport::Voice::EchoTool.name,
+        arguments: {"text" => "first"}
+      )
+    )
+    budget_adapter.emit(
+      Riffer::Voice::Events::ToolCall.new(
+        call_id: "call-14",
+        name: TestSupport::Voice::EchoTool.name,
+        arguments: {"text" => "second"}
+      )
+    )
+
+    budget_agent.next_event(timeout: 0)
+    budget_agent.next_event(timeout: 0)
+
+    expect(budget_adapter.tool_responses.first[:result]).must_equal "voice: first"
+    error_payload = budget_adapter.tool_responses.last[:result]
+    expect(error_payload).must_be_instance_of Hash
+    expect(error_payload.dig("error", "type")).must_equal "tool_call_budget_exceeded"
+    expect(budget_agent.action_budget_state).must_equal({
+      max_tool_calls: 1,
+      max_mutation_calls: nil,
+      tool_calls: 1,
+      mutation_tool_calls: 0
+    })
+  ensure
+    budget_agent.close unless budget_agent.nil? || budget_agent.closed?
+  end
+
+  it "enforces mutation budget using mutation_classifier hook" do
+    mutation_agent = TestSupport::Voice::SupportVoiceAgent.new(
+      tool_context: {prefix: "voice"},
+      action_budget: {max_mutation_calls: 1},
+      mutation_classifier: ->(**_kwargs) { true }
+    )
+    mutation_adapter = TestSupport::Voice::FakeAdapter.new
+    mutation_agent.connect(runtime: :background, adapter_factory: ->(**_kwargs) { mutation_adapter })
+    mutation_adapter.emit(
+      Riffer::Voice::Events::ToolCall.new(
+        call_id: "call-15",
+        name: TestSupport::Voice::EchoTool.name,
+        arguments: {"text" => "first"}
+      )
+    )
+    mutation_adapter.emit(
+      Riffer::Voice::Events::ToolCall.new(
+        call_id: "call-16",
+        name: TestSupport::Voice::EchoTool.name,
+        arguments: {"text" => "second"}
+      )
+    )
+
+    mutation_agent.next_event(timeout: 0)
+    mutation_agent.next_event(timeout: 0)
+
+    expect(mutation_adapter.tool_responses.first[:result]).must_equal "voice: first"
+    error_payload = mutation_adapter.tool_responses.last[:result]
+    expect(error_payload).must_be_instance_of Hash
+    expect(error_payload.dig("error", "type")).must_equal "mutation_budget_exceeded"
+    expect(mutation_agent.action_budget_state).must_equal({
+      max_tool_calls: nil,
+      max_mutation_calls: 1,
+      tool_calls: 1,
+      mutation_tool_calls: 1
+    })
+  ensure
+    mutation_agent.close unless mutation_agent.nil? || mutation_agent.closed?
+  end
+
+  it "supports tool_policy and approval_callback gating" do
+    policy_agent = TestSupport::Voice::SupportVoiceAgent.new(
+      tool_context: {prefix: "voice"},
+      tool_policy: ->(**_kwargs) { :require_approval },
+      approval_callback: ->(**_kwargs) { true }
+    )
+    policy_adapter = TestSupport::Voice::FakeAdapter.new
+    policy_agent.connect(runtime: :background, adapter_factory: ->(**_kwargs) { policy_adapter })
+    policy_adapter.emit(
+      Riffer::Voice::Events::ToolCall.new(
+        call_id: "call-17",
+        name: TestSupport::Voice::EchoTool.name,
+        arguments: {"text" => "approved"}
+      )
+    )
+
+    policy_agent.next_event(timeout: 0)
+
+    expect(policy_adapter.tool_responses).must_equal([{call_id: "call-17", result: "voice: approved"}])
+  ensure
+    policy_agent.close unless policy_agent.nil? || policy_agent.closed?
+  end
+
+  it "returns typed policy_denied errors when tool_policy denies dispatch" do
+    denied_agent = TestSupport::Voice::SupportVoiceAgent.new(
+      tool_policy: ->(**_kwargs) { :deny }
+    )
+    denied_adapter = TestSupport::Voice::FakeAdapter.new
+    denied_agent.connect(runtime: :background, adapter_factory: ->(**_kwargs) { denied_adapter })
+    denied_adapter.emit(
+      Riffer::Voice::Events::ToolCall.new(
+        call_id: "call-18-deny",
+        name: TestSupport::Voice::EchoTool.name,
+        arguments: {"text" => "deny"}
+      )
+    )
+
+    denied_agent.next_event(timeout: 0)
+
+    payload = denied_adapter.tool_responses.first[:result]
+    expect(payload).must_be_instance_of Hash
+    expect(payload.dig("error", "type")).must_equal "policy_denied"
+  ensure
+    denied_agent.close unless denied_agent.nil? || denied_agent.closed?
+  end
+
+  it "returns typed approval_required errors when approval callback is absent" do
+    approval_required_agent = TestSupport::Voice::SupportVoiceAgent.new(
+      tool_policy: ->(**_kwargs) { :require_approval }
+    )
+    approval_required_adapter = TestSupport::Voice::FakeAdapter.new
+    approval_required_agent.connect(runtime: :background, adapter_factory: ->(**_kwargs) { approval_required_adapter })
+    approval_required_adapter.emit(
+      Riffer::Voice::Events::ToolCall.new(
+        call_id: "call-18",
+        name: TestSupport::Voice::EchoTool.name,
+        arguments: {"text" => "blocked"}
+      )
+    )
+    approval_required_agent.next_event(timeout: 0)
+    required_payload = approval_required_adapter.tool_responses.first[:result]
+    expect(required_payload.dig("error", "type")).must_equal "approval_required"
+  ensure
+    approval_required_agent.close unless approval_required_agent.nil? || approval_required_agent.closed?
+  end
+
+  it "validates action_budget and policy hook inputs" do
+    error = expect {
+      Riffer::Voice::Agent.new(action_budget: "bad")
+    }.must_raise Riffer::ArgumentError
+    expect(error.message).must_equal "action_budget must be a Hash"
+
+    error = expect {
+      Class.new(Riffer::Voice::Agent) do
+        action_budget max_tool_calls: 0
+      end
+    }.must_raise Riffer::ArgumentError
+    expect(error.message).must_equal "action_budget[max_tool_calls] must be nil or an Integer > 0"
+
+    error = expect {
+      Riffer::Voice::Agent.new(tool_policy: "bad")
+    }.must_raise Riffer::ArgumentError
+    expect(error.message).must_equal "tool_policy must respond to #call"
+
+    error = expect {
+      Riffer::Voice::Agent.new(approval_callback: "bad")
+    }.must_raise Riffer::ArgumentError
+    expect(error.message).must_equal "approval_callback must respond to #call"
   end
 end

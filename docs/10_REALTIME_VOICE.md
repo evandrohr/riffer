@@ -168,6 +168,10 @@ Supported profile fields:
 - `runtime`
 - `voice_config`
 - `tool_executor`
+- `action_budget`
+- `mutation_classifier`
+- `tool_policy`
+- `approval_callback`
 
 Precedence with profiles is:
 
@@ -237,6 +241,33 @@ Schema-hash declared tools (non-`Riffer::Tool` classes) have explicit behavior:
 
 - without `tool_executor`: response error type is `external_tool_executor_required`
 - with `tool_executor`: dispatch is delegated to the custom executor
+
+### Voice Agent Policy Gates and Action Budgets
+
+`Riffer::Voice::Agent` can apply dispatch-time governance before automatic tool execution:
+
+- action budgets (`max_tool_calls`, `max_mutation_calls`)
+- mutation classifier hook (`mutation_classifier`)
+- policy hook (`tool_policy`)
+- approval hook (`approval_callback`)
+
+```ruby
+agent = SupportVoiceAgent.connect(
+  action_budget: {max_tool_calls: 10, max_mutation_calls: 2},
+  mutation_classifier: ->(tool_name:, **_) { tool_name.start_with?("write_") },
+  tool_policy: ->(mutation_call:, **_) { mutation_call ? :require_approval : :allow },
+  approval_callback: ->(**_) { true }
+)
+```
+
+Policy outcomes are serialized into typed tool errors when blocked:
+
+- `tool_call_budget_exceeded`
+- `mutation_budget_exceeded`
+- `policy_denied`
+- `approval_required`
+- `approval_denied`
+- `approval_error`
 
 ## Validation and Error Behavior
 

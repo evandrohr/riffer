@@ -27,7 +27,7 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 | VA2 | Callback registry + event router | DONE | Riffer maintainers | `on_event` + typed callbacks with deterministic failure policy |
 | VA3 | Tool execution pipeline + hooks | DONE | Riffer maintainers | pluggable executor + lifecycle hooks + schema-hash behavior |
 | VA4 | Role profiles | DONE | Riffer maintainers | profile DSL + `connect(profile: ...)` with deterministic precedence |
-| VA5 | Policy gates + action budgets | PLANNED | Riffer maintainers | generic guard hooks for mutation/action control |
+| VA5 | Policy gates + action budgets | DONE | Riffer maintainers | budget counters + mutation classifier + policy/approval hooks |
 | VA6 | Run helpers + lifecycle semantics | PLANNED | Riffer maintainers | `run_loop`, turn-complete helper, drain helpers |
 | VA7 | Durability hooks | PLANNED | Riffer maintainers | checkpoint/snapshot hooks, app-managed persistence |
 | VA8 | Docs/examples/migration guidance | PLANNED | Riffer maintainers | Session vs Voice Agent, profile/policy/durability examples |
@@ -41,7 +41,7 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 - [x] Add custom tool executor injection contract.
 - [x] Add before/after/on-error tool execution hooks.
 - [x] Add profile DSL and profile-aware connect path.
-- [ ] Add policy hooks (approval + budget + mutation classifier interface).
+- [x] Add policy hooks (approval + budget + mutation classifier interface).
 - [ ] Add helper methods for common event loops.
 - [ ] Add snapshot/checkpoint hooks for durability integration.
 - [ ] Add migration examples from manual session loops.
@@ -70,6 +70,10 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 
 | Date | Command | Result | Notes |
 | --- | --- | --- | --- |
+| 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/agent_test.rb` | Pass | VA5 policy/budget coverage added (`36 runs, 0 failures`) |
+| 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/session_test.rb` | Pass | regression check after VA5 policy pipeline |
+| 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/connect_validation_test.rb` | Pass | connect/validation behavior preserved after VA5 |
+| 2026-02-28 | `RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake standard` | Pass | VA5 lint pass |
 | 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/agent_test.rb` | Pass | VA4 profile coverage added (`30 runs, 0 failures`) |
 | 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/session_test.rb` | Pass | regression check after VA4 profile changes |
 | 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/connect_validation_test.rb` | Pass | connect/validation behavior preserved after VA4 |
@@ -92,6 +96,27 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 ## Session Change Log (Newest First)
 
 ## 2026-02-28
+
+- Completed VA5 (`Policy gates + action budgets`) with:
+  - action budget support:
+    - `max_tool_calls`
+    - `max_mutation_calls`
+  - mutation classifier hook (`mutation_classifier`).
+  - dispatch policy hook (`tool_policy`).
+  - approval hook (`approval_callback`) for policy-gated operations.
+  - typed policy error responses:
+    - `tool_call_budget_exceeded`
+    - `mutation_budget_exceeded`
+    - `policy_denied`
+    - `approval_required`
+    - `approval_denied`
+    - `approval_error`
+  - profile support for safety defaults (`action_budget`, `mutation_classifier`, `tool_policy`, `approval_callback`).
+  - expanded tests in `test/riffer/voice/agent_test.rb` for budget, policy, and approval behavior.
+- Updated docs:
+  - `docs/10_REALTIME_VOICE.md` (policy gates + action budgets section)
+- Next step:
+  - execute VA6 from `docs/voice-agent-implementation-plan.md`.
 
 - Completed VA4 (`Role profiles`) with:
   - class-level profile DSL: `profile :name do ... end`.

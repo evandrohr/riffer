@@ -74,6 +74,45 @@ class Riffer::Voice::Agent
     @tool_executor = executor
   end
 
+  # Gets or sets action budget defaults enforced during automatic tool dispatch.
+  #
+  #: (**untyped) -> Hash[Symbol, Integer?]
+  def self.action_budget(**kwargs)
+    return deep_copy(@action_budget || {}) if kwargs.empty?
+
+    @action_budget = validate_action_budget_config!(kwargs, "action_budget")
+  end
+
+  # Gets or sets the mutation classifier used by budget/policy checks.
+  #
+  #: (?(^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> bool)?) -> ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> bool
+  def self.mutation_classifier(classifier = nil)
+    return @mutation_classifier if classifier.nil?
+    raise Riffer::ArgumentError, "mutation_classifier must respond to #call" unless classifier.respond_to?(:call)
+
+    @mutation_classifier = classifier
+  end
+
+  # Gets or sets the dispatch policy hook used before automatic tool execution.
+  #
+  #: (?(^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped)?) -> ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped
+  def self.tool_policy(policy = nil)
+    return @tool_policy if policy.nil?
+    raise Riffer::ArgumentError, "tool_policy must respond to #call" unless policy.respond_to?(:call)
+
+    @tool_policy = policy
+  end
+
+  # Gets or sets the approval callback used for gated tool dispatch.
+  #
+  #: (?(^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent, decision: Hash[Symbol, untyped]) -> untyped)?) -> ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent, decision: Hash[Symbol, untyped]) -> untyped
+  def self.approval_callback(callback = nil)
+    return @approval_callback if callback.nil?
+    raise Riffer::ArgumentError, "approval_callback must respond to #call" unless callback.respond_to?(:call)
+
+    @approval_callback = callback
+  end
+
   # Gets or sets the default runtime mode used by #connect.
   #
   #: (?Symbol?) -> Symbol?
@@ -145,20 +184,40 @@ class Riffer::Voice::Agent
     tool_context = kwargs.delete(:tool_context)
     auto_handle_tool_calls = kwargs.delete(:auto_handle_tool_calls)
     tool_executor = kwargs.delete(:tool_executor)
+    action_budget = kwargs.delete(:action_budget)
+    mutation_classifier = kwargs.delete(:mutation_classifier)
+    tool_policy = kwargs.delete(:tool_policy)
+    approval_callback = kwargs.delete(:approval_callback)
     init_options = {tool_context: tool_context}
     init_options[:auto_handle_tool_calls] = auto_handle_tool_calls unless auto_handle_tool_calls.nil?
     init_options[:tool_executor] = tool_executor unless tool_executor.nil?
+    init_options[:action_budget] = action_budget unless action_budget.nil?
+    init_options[:mutation_classifier] = mutation_classifier unless mutation_classifier.nil?
+    init_options[:tool_policy] = tool_policy unless tool_policy.nil?
+    init_options[:approval_callback] = approval_callback unless approval_callback.nil?
     agent = new(**init_options)
     agent.connect(**kwargs)
     agent
   end
 
-  #: (?tool_context: Hash[Symbol, untyped]?, ?auto_handle_tool_calls: bool?, ?tool_executor: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped?) -> void
-  def initialize(tool_context: nil, auto_handle_tool_calls: nil, tool_executor: nil)
+  #: (?tool_context: Hash[Symbol, untyped]?, ?auto_handle_tool_calls: bool?, ?tool_executor: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped?, ?action_budget: Hash[Symbol | String, untyped]?, ?mutation_classifier: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> bool?, ?tool_policy: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped?, ?approval_callback: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent, decision: Hash[Symbol, untyped]) -> untyped?) -> void
+  def initialize(
+    tool_context: nil,
+    auto_handle_tool_calls: nil,
+    tool_executor: nil,
+    action_budget: nil,
+    mutation_classifier: nil,
+    tool_policy: nil,
+    approval_callback: nil
+  )
     raise Riffer::ArgumentError, "tool_context must be a Hash or nil" unless tool_context.nil? || tool_context.is_a?(Hash)
     invalid_auto_tool_calls = !auto_handle_tool_calls.nil? && auto_handle_tool_calls != true && auto_handle_tool_calls != false
     raise Riffer::ArgumentError, "auto_handle_tool_calls must be true, false, or nil" if invalid_auto_tool_calls
     validate_tool_executor!(tool_executor, "tool_executor") unless tool_executor.nil?
+    validate_action_budget_config!(action_budget, "action_budget") unless action_budget.nil?
+    validate_callable!(mutation_classifier, "mutation_classifier") unless mutation_classifier.nil?
+    validate_callable!(tool_policy, "tool_policy") unless tool_policy.nil?
+    validate_callable!(approval_callback, "approval_callback") unless approval_callback.nil?
 
     @tool_context = tool_context
     @auto_handle_tool_calls = auto_handle_tool_calls.nil? ? self.class.auto_handle_tool_calls : auto_handle_tool_calls
@@ -166,6 +225,10 @@ class Riffer::Voice::Agent
     @instructions_text = self.class.instructions
     @tools_config = self.class.uses_tools
     @tool_executor = tool_executor || self.class.tool_executor
+    @action_budget = action_budget.nil? ? self.class.action_budget : validate_action_budget_config!(action_budget, "action_budget")
+    @mutation_classifier = mutation_classifier || self.class.mutation_classifier
+    @tool_policy = tool_policy || self.class.tool_policy
+    @approval_callback = approval_callback || self.class.approval_callback
     @runtime_config = self.class.runtime
     @voice_config = self.class.voice_config
     @connected_tools = [] #: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]
@@ -173,11 +236,26 @@ class Riffer::Voice::Agent
     @before_tool_execution_hooks = [] #: Array[^(Hash[Symbol, untyped]) -> void]
     @after_tool_execution_hooks = [] #: Array[^(Hash[Symbol, untyped]) -> void]
     @tool_execution_error_hooks = [] #: Array[^(Hash[Symbol, untyped]) -> void]
+    @tool_call_count = 0
+    @mutation_tool_call_count = 0
     @session = nil
   end
 
-  #: (?model: String?, ?system_prompt: String?, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]?, ?config: Hash[Symbol | String, untyped]?, ?runtime: Symbol?, ?tool_executor: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped?, ?adapter_factory: ^(adapter_identifier: Symbol, model: String, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync)) -> untyped) -> self
-  def connect(model: nil, system_prompt: nil, tools: nil, config: nil, runtime: nil, profile: nil, tool_executor: nil, adapter_factory: nil)
+  #: (?model: String?, ?system_prompt: String?, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]?, ?config: Hash[Symbol | String, untyped]?, ?runtime: Symbol?, ?profile: (String | Symbol)?, ?tool_executor: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped?, ?action_budget: Hash[Symbol | String, untyped]?, ?mutation_classifier: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> bool?, ?tool_policy: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped?, ?approval_callback: ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent, decision: Hash[Symbol, untyped]) -> untyped?, ?adapter_factory: ^(adapter_identifier: Symbol, model: String, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync)) -> untyped) -> self
+  def connect(
+    model: nil,
+    system_prompt: nil,
+    tools: nil,
+    config: nil,
+    runtime: nil,
+    profile: nil,
+    tool_executor: nil,
+    action_budget: nil,
+    mutation_classifier: nil,
+    tool_policy: nil,
+    approval_callback: nil,
+    adapter_factory: nil
+  )
     close if @session && !@session.closed?
     profile_config = resolve_profile(profile)
 
@@ -189,6 +267,15 @@ class Riffer::Voice::Agent
       validate_tool_executor!(profile_config[:tool_executor], "profile tool_executor")
       @tool_executor = profile_config[:tool_executor]
     end
+    @action_budget = resolve_action_budget(action_budget, profile_config)
+    @mutation_classifier = resolve_mutation_classifier(mutation_classifier, profile_config)
+    @tool_policy = resolve_tool_policy(tool_policy, profile_config)
+    @approval_callback = resolve_approval_callback(approval_callback, profile_config)
+    validate_callable!(@mutation_classifier, "mutation_classifier") unless @mutation_classifier.nil?
+    validate_callable!(@tool_policy, "tool_policy") unless @tool_policy.nil?
+    validate_callable!(@approval_callback, "approval_callback") unless @approval_callback.nil?
+    @tool_call_count = 0
+    @mutation_tool_call_count = 0
 
     resolved_model = resolve_model(model, profile_config)
     resolved_system_prompt = resolve_system_prompt(system_prompt, profile_config)
@@ -221,6 +308,18 @@ class Riffer::Voice::Agent
   #: () -> Symbol
   def runtime_kind
     current_session.runtime_kind
+  end
+
+  # Returns current action budget limits and counters for this connection.
+  #
+  #: () -> Hash[Symbol, Integer?]
+  def action_budget_state
+    {
+      max_tool_calls: @action_budget[:max_tool_calls],
+      max_mutation_calls: @action_budget[:max_mutation_calls],
+      tool_calls: @tool_call_count,
+      mutation_tool_calls: @mutation_tool_call_count
+    }
   end
 
   # Registers a callback invoked for every consumed voice event.
@@ -434,6 +533,13 @@ class Riffer::Voice::Agent
     }
 
     begin
+      policy_error = evaluate_dispatch_policy(hook_payload)
+      if policy_error
+        invoke_tool_hooks(@after_tool_execution_hooks, hook_payload.merge(result: policy_error))
+        invoke_tool_hooks(@tool_execution_error_hooks, hook_payload.merge(result: policy_error))
+        return policy_error
+      end
+
       invoke_tool_hooks(@before_tool_execution_hooks, hook_payload)
       result = execute_tool_call_with_strategy(
         tool_call_event: tool_call_event,
@@ -457,6 +563,217 @@ class Riffer::Voice::Agent
       safely_invoke_tool_error_hooks(hook_payload, result, e)
       result
     end
+  end
+
+  #: (Hash[Symbol, untyped]) -> Riffer::Tools::Response?
+  def evaluate_dispatch_policy(hook_payload)
+    mutation_call = mutation_tool_call?(hook_payload)
+    hook_payload[:mutation_call] = mutation_call
+
+    budget_error = action_budget_error(mutation_call: mutation_call)
+    return budget_error if budget_error
+
+    decision = evaluate_tool_policy_decision(hook_payload)
+    return policy_error_response(type: :policy_error, message: decision[:message]) if decision[:action] == :error
+
+    decision = resolve_approval_decision(decision, hook_payload)
+    if decision[:action] == :allow
+      register_tool_dispatch(mutation_call: mutation_call)
+      return nil
+    end
+
+    policy_error_response(type: decision[:type], message: decision[:message])
+  end
+
+  #: (Hash[Symbol, untyped]) -> bool
+  def mutation_tool_call?(hook_payload)
+    return false if @mutation_classifier.nil?
+
+    result = @mutation_classifier.call(
+      tool_call_event: hook_payload[:event],
+      tool_class: hook_payload[:tool_class],
+      schema_tool: hook_payload[:schema_tool],
+      arguments: hook_payload[:arguments],
+      context: @tool_context,
+      agent: self
+    )
+    result == true
+  rescue => error
+    raise Riffer::Error,
+      "mutation_classifier failed for #{hook_payload[:tool_name]}: #{error.class}: #{error.message}"
+  end
+
+  #: (mutation_call: bool) -> Riffer::Tools::Response?
+  def action_budget_error(mutation_call:)
+    max_tool_calls = @action_budget[:max_tool_calls]
+    if max_tool_calls && @tool_call_count >= max_tool_calls
+      return policy_error_response(
+        type: :tool_call_budget_exceeded,
+        message: "Tool call budget exceeded (max_tool_calls=#{max_tool_calls})"
+      )
+    end
+
+    max_mutation_calls = @action_budget[:max_mutation_calls]
+    if mutation_call && max_mutation_calls && @mutation_tool_call_count >= max_mutation_calls
+      return policy_error_response(
+        type: :mutation_budget_exceeded,
+        message: "Mutation tool call budget exceeded (max_mutation_calls=#{max_mutation_calls})"
+      )
+    end
+
+    nil
+  end
+
+  #: (mutation_call: bool) -> void
+  def register_tool_dispatch(mutation_call:)
+    @tool_call_count += 1
+    @mutation_tool_call_count += 1 if mutation_call
+  end
+
+  #: (Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+  def evaluate_tool_policy_decision(hook_payload)
+    return {action: :allow} if @tool_policy.nil?
+
+    raw_decision = @tool_policy.call(
+      tool_call_event: hook_payload[:event],
+      tool_name: hook_payload[:tool_name],
+      tool_class: hook_payload[:tool_class],
+      schema_tool: hook_payload[:schema_tool],
+      arguments: hook_payload[:arguments],
+      mutation_call: hook_payload[:mutation_call],
+      context: @tool_context,
+      agent: self
+    )
+    normalize_policy_decision(raw_decision)
+  rescue => error
+    {
+      action: :error,
+      type: :policy_error,
+      message: "tool_policy failed for #{hook_payload[:tool_name]}: #{error.class}: #{error.message}"
+    }
+  end
+
+  #: (Hash[Symbol, untyped], Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+  def resolve_approval_decision(decision, hook_payload)
+    return decision unless decision[:action] == :require_approval
+    return {action: :deny, type: :approval_required, message: decision[:message]} if @approval_callback.nil?
+
+    raw_decision = @approval_callback.call(
+      tool_call_event: hook_payload[:event],
+      tool_name: hook_payload[:tool_name],
+      tool_class: hook_payload[:tool_class],
+      schema_tool: hook_payload[:schema_tool],
+      arguments: hook_payload[:arguments],
+      mutation_call: hook_payload[:mutation_call],
+      context: @tool_context,
+      agent: self,
+      decision: decision
+    )
+    normalize_approval_decision(raw_decision, hook_payload[:tool_name])
+  rescue => error
+    {
+      action: :deny,
+      type: :approval_error,
+      message: "approval_callback failed for #{hook_payload[:tool_name]}: #{error.class}: #{error.message}"
+    }
+  end
+
+  #: (untyped) -> Hash[Symbol, untyped]
+  def normalize_policy_decision(raw_decision)
+    case raw_decision
+    when nil, true, :allow
+      {action: :allow}
+    when false, :deny
+      {action: :deny, type: :policy_denied, message: "Tool dispatch denied by policy"}
+    when :require_approval
+      {action: :require_approval, type: :approval_required, message: "Tool dispatch requires approval"}
+    when Hash
+      normalize_hash_policy_decision(raw_decision)
+    else
+      {
+        action: :deny,
+        type: :policy_error,
+        message: "tool_policy returned unsupported decision: #{raw_decision.inspect}"
+      }
+    end
+  end
+
+  #: (Hash[Symbol | String, untyped]) -> Hash[Symbol, untyped]
+  def normalize_hash_policy_decision(raw_decision)
+    action_value = hash_value(raw_decision, :action)
+    action = case action_value
+    when :allow, "allow"
+      :allow
+    when :deny, "deny"
+      :deny
+    when :require_approval, "require_approval"
+      :require_approval
+    else
+      :deny
+    end
+
+    type = hash_value(raw_decision, :type) || default_policy_type_for(action)
+    message = hash_value(raw_decision, :message) || default_policy_message_for(action)
+    {action: action, type: type.to_sym, message: message.to_s}
+  end
+
+  #: (untyped, String) -> Hash[Symbol, untyped]
+  def normalize_approval_decision(raw_decision, tool_name)
+    case raw_decision
+    when true, :allow
+      {action: :allow}
+    when false, nil, :deny
+      {action: :deny, type: :approval_denied, message: "Approval denied for tool '#{tool_name}'"}
+    when Hash
+      approved = hash_value(raw_decision, :approved) == true
+      return {action: :allow} if approved
+
+      message = hash_value(raw_decision, :message) || "Approval denied for tool '#{tool_name}'"
+      type = hash_value(raw_decision, :type) || :approval_denied
+      {action: :deny, type: type.to_sym, message: message.to_s}
+    else
+      {
+        action: :deny,
+        type: :approval_error,
+        message: "approval_callback returned unsupported decision for tool '#{tool_name}'"
+      }
+    end
+  end
+
+  #: (Symbol) -> Symbol
+  def default_policy_type_for(action)
+    case action
+    when :allow
+      :policy_allowed
+    when :require_approval
+      :approval_required
+    else
+      :policy_denied
+    end
+  end
+
+  #: (Symbol) -> String
+  def default_policy_message_for(action)
+    case action
+    when :allow
+      "Tool dispatch allowed by policy"
+    when :require_approval
+      "Tool dispatch requires approval"
+    else
+      "Tool dispatch denied by policy"
+    end
+  end
+
+  #: (Hash[Symbol | String, untyped], Symbol) -> untyped
+  def hash_value(hash, key)
+    return hash[key] if hash.key?(key)
+
+    hash[key.to_s]
+  end
+
+  #: (type: Symbol, message: String) -> Riffer::Tools::Response
+  def policy_error_response(type:, message:)
+    Riffer::Tools::Response.error(message, type: type)
   end
 
   #: (tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped]) -> Riffer::Tools::Response
@@ -685,6 +1002,44 @@ class Riffer::Voice::Agent
     runtime
   end
 
+  #: (Hash[Symbol | String, untyped]?, Hash[Symbol, untyped]) -> Hash[Symbol, Integer?]
+  def resolve_action_budget(action_budget_override, profile_config)
+    base_budget = deep_copy(@action_budget || {})
+    if profile_config.key?(:action_budget)
+      profile_budget = validate_action_budget_config!(profile_config[:action_budget], "profile action_budget")
+      base_budget = deep_merge(base_budget, profile_budget)
+    end
+
+    return base_budget if action_budget_override.nil?
+
+    override_budget = validate_action_budget_config!(action_budget_override, "action_budget")
+    deep_merge(base_budget, override_budget)
+  end
+
+  #: (untyped, Hash[Symbol, untyped]) -> untyped
+  def resolve_mutation_classifier(classifier_override, profile_config)
+    return classifier_override unless classifier_override.nil?
+    return profile_config[:mutation_classifier] if profile_config.key?(:mutation_classifier)
+
+    @mutation_classifier
+  end
+
+  #: (untyped, Hash[Symbol, untyped]) -> untyped
+  def resolve_tool_policy(policy_override, profile_config)
+    return policy_override unless policy_override.nil?
+    return profile_config[:tool_policy] if profile_config.key?(:tool_policy)
+
+    @tool_policy
+  end
+
+  #: (untyped, Hash[Symbol, untyped]) -> untyped
+  def resolve_approval_callback(approval_override, profile_config)
+    return approval_override unless approval_override.nil?
+    return profile_config[:approval_callback] if profile_config.key?(:approval_callback)
+
+    @approval_callback
+  end
+
   #: (untyped) -> untyped
   def resolve_configured_value(value)
     return value unless value.is_a?(Proc)
@@ -710,6 +1065,31 @@ class Riffer::Voice::Agent
   #: (untyped, String) -> void
   def validate_tool_executor!(executor, argument_name)
     raise Riffer::ArgumentError, "#{argument_name} must respond to #call" unless executor.respond_to?(:call)
+  end
+
+  #: (untyped, String) -> void
+  def validate_callable!(callable, argument_name)
+    raise Riffer::ArgumentError, "#{argument_name} must respond to #call" unless callable.respond_to?(:call)
+  end
+
+  #: (untyped, String) -> Hash[Symbol, Integer?]
+  def validate_action_budget_config!(config, argument_name)
+    raise Riffer::ArgumentError, "#{argument_name} must be a Hash" unless config.is_a?(Hash)
+
+    normalized = {}
+    config.each do |raw_key, raw_value|
+      key = raw_key.to_sym
+      unless [:max_tool_calls, :max_mutation_calls].include?(key)
+        raise Riffer::ArgumentError,
+          "#{argument_name} supports only :max_tool_calls and :max_mutation_calls"
+      end
+      invalid_value = !raw_value.nil? && (!raw_value.is_a?(Integer) || raw_value <= 0)
+      raise Riffer::ArgumentError, "#{argument_name}[#{key}] must be nil or an Integer > 0" if invalid_value
+
+      normalized[key] = raw_value
+    end
+
+    normalized
   end
 
   #: (untyped) -> String
@@ -763,6 +1143,27 @@ class Riffer::Voice::Agent
     end
   end
   private_class_method :normalize_profile_name!
+
+  #: (untyped, String) -> Hash[Symbol, Integer?]
+  def self.validate_action_budget_config!(config, argument_name)
+    raise Riffer::ArgumentError, "#{argument_name} must be a Hash" unless config.is_a?(Hash)
+
+    normalized = {}
+    config.each do |raw_key, raw_value|
+      key = raw_key.to_sym
+      unless [:max_tool_calls, :max_mutation_calls].include?(key)
+        raise Riffer::ArgumentError,
+          "#{argument_name} supports only :max_tool_calls and :max_mutation_calls"
+      end
+      invalid_value = !raw_value.nil? && (!raw_value.is_a?(Integer) || raw_value <= 0)
+      raise Riffer::ArgumentError, "#{argument_name}[#{key}] must be nil or an Integer > 0" if invalid_value
+
+      normalized[key] = raw_value
+    end
+
+    normalized
+  end
+  private_class_method :validate_action_budget_config!
 
   # Internal profile DSL builder.
   class ProfileDefinition
@@ -823,6 +1224,41 @@ class Riffer::Voice::Agent
       @settings[:tool_executor] = executor
     end
 
+    # Sets budget constraints for automatic tool dispatch in this profile.
+    #
+    #: (**untyped) -> Hash[Symbol, Integer?]
+    def action_budget(**kwargs)
+      return deep_copy(@settings[:action_budget] || {}) if kwargs.empty?
+      raise Riffer::ArgumentError, "profile action_budget must include settings" if kwargs.empty?
+
+      normalized = validate_action_budget_config!(kwargs, "profile action_budget")
+      @settings[:action_budget] = normalized
+    end
+
+    #: (?(^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> bool)?) -> ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> bool
+    def mutation_classifier(classifier = nil)
+      return @settings[:mutation_classifier] if classifier.nil?
+      raise Riffer::ArgumentError, "profile mutation_classifier must respond to #call" unless classifier.respond_to?(:call)
+
+      @settings[:mutation_classifier] = classifier
+    end
+
+    #: (?(^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped)?) -> ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent) -> untyped
+    def tool_policy(policy = nil)
+      return @settings[:tool_policy] if policy.nil?
+      raise Riffer::ArgumentError, "profile tool_policy must respond to #call" unless policy.respond_to?(:call)
+
+      @settings[:tool_policy] = policy
+    end
+
+    #: (?(^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent, decision: Hash[Symbol, untyped]) -> untyped)?) -> ^(tool_call_event: Riffer::Voice::Events::ToolCall, tool_name: String, tool_class: singleton(Riffer::Tool)?, schema_tool: Hash[Symbol | String, untyped]?, arguments: Hash[Symbol, untyped], mutation_call: bool, context: Hash[Symbol, untyped]?, agent: Riffer::Voice::Agent, decision: Hash[Symbol, untyped]) -> untyped
+    def approval_callback(callback = nil)
+      return @settings[:approval_callback] if callback.nil?
+      raise Riffer::ArgumentError, "profile approval_callback must respond to #call" unless callback.respond_to?(:call)
+
+      @settings[:approval_callback] = callback
+    end
+
     #: () -> Hash[Symbol, untyped]
     def to_h
       deep_copy(@settings)
@@ -842,6 +1278,26 @@ class Riffer::Voice::Agent
       else
         value
       end
+    end
+
+    #: (untyped, String) -> Hash[Symbol, Integer?]
+    def validate_action_budget_config!(config, argument_name)
+      raise Riffer::ArgumentError, "#{argument_name} must be a Hash" unless config.is_a?(Hash)
+
+      normalized = {}
+      config.each do |raw_key, raw_value|
+        key = raw_key.to_sym
+        unless [:max_tool_calls, :max_mutation_calls].include?(key)
+          raise Riffer::ArgumentError,
+            "#{argument_name} supports only :max_tool_calls and :max_mutation_calls"
+        end
+        invalid_value = !raw_value.nil? && (!raw_value.is_a?(Integer) || raw_value <= 0)
+        raise Riffer::ArgumentError, "#{argument_name}[#{key}] must be nil or an Integer > 0" if invalid_value
+
+        normalized[key] = raw_value
+      end
+
+      normalized
     end
   end
 
