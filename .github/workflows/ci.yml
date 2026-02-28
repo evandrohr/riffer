@@ -48,3 +48,23 @@ jobs:
         run: git diff --exit-code sig/generated/
       - name: Run Steep type check
         run: bundle exec steep check
+
+  voice_quality:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      - name: Generate voice RubyCritic report
+        run: bundle exec rake quality:voice:rubycritic
+      - name: Summarize voice RubyCritic ratings
+        run: bundle exec rake quality:voice:gate
+      - name: Upload voice RubyCritic report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rubycritic-voice-report
+          path: tmp/rubycritic-voice/

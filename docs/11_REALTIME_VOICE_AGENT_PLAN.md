@@ -130,6 +130,23 @@ Results:
   - `A`: `openai_realtime_parser.rb`, `openai_realtime_parser_constants.rb`, `openai_realtime_parser_dispatch.rb`, `openai_realtime_parser_tools.rb`
   - `B`: `openai_realtime_parser_content.rb`, `openai_realtime_parser_response.rb`
 
+## Progress Checkpoint (2026-02-28, VA7)
+
+Quality guardrail commands:
+
+```sh
+bundle exec rake quality:voice:rubycritic
+bundle exec rake quality:voice:gate
+```
+
+Results:
+
+- Added reproducible voice-focused task for `lib/riffer/voice/**`.
+- Added non-blocking gate summary task with optional strict mode:
+  - strict mode example: `bundle exec rake quality:voice:gate RUBYCRITIC_ENFORCE=1 RUBYCRITIC_MIN_RATING=B`
+- Current voice-wide RubyCritic score: `75.9` (reported in `tmp/rubycritic-voice/report.json`).
+- CI now runs the voice-quality report + gate in a non-blocking job and uploads the report artifact.
+
 ## Implementation Sequence
 
 Use this order for the best impact/effort ratio:
@@ -214,9 +231,9 @@ Success criteria:
 
 ### VA7. CI quality guardrails
 
-- [ ] Add or update a reproducible RubyCritic task focused on `lib/riffer/voice/**`.
-- [ ] Keep guardrail non-blocking first, then evolve toward threshold checks.
-- [ ] Document how to run and interpret quality checks in repo docs.
+- [x] Add or update a reproducible RubyCritic task focused on `lib/riffer/voice/**`.
+- [x] Keep guardrail non-blocking first, then evolve toward threshold checks.
+- [x] Document how to run and interpret quality checks in repo docs.
 
 Success criteria:
 
@@ -232,7 +249,7 @@ Success criteria:
 | VA4 | `[x]` | current branch | Session lifecycle and snapshot orchestration extracted; `agent.rb` now thin coordinator (`A`). |
 | VA5 | `[x]` | current branch | Shared runtime/lifecycle helpers + split OpenAI/Gemini driver concerns into focused modules. |
 | VA6 | `[x]` | current branch | OpenAI realtime parser split into dispatch/constants/content/response/tools modules, preserving parser API and tests. |
-| VA7 | `[ ]` |  |  |
+| VA7 | `[x]` | current branch | Added `quality:voice:rubycritic` + `quality:voice:gate`, non-blocking CI job, and docs section for usage/enforcement. |
 
 ## Definition Of Done
 

@@ -464,6 +464,30 @@ Application responsibilities remain outside Riffer core:
 
 Use checkpoints and snapshots to connect `Voice::Agent` to your own persistence and workflow layers.
 
+## Voice Quality Checks
+
+Use voice-focused RubyCritic checks for `lib/riffer/voice/**`:
+
+```sh
+# Generate JSON report in tmp/rubycritic-voice/report.json
+bundle exec rake quality:voice:rubycritic
+
+# Print modules below the minimum rating (default: B), non-blocking by default
+bundle exec rake quality:voice:gate
+```
+
+Optional strict mode for local/CI experiments:
+
+```sh
+bundle exec rake quality:voice:gate RUBYCRITIC_ENFORCE=1 RUBYCRITIC_MIN_RATING=B
+```
+
+Interpretation:
+
+- ratings are per module (`A` best, `F` worst)
+- `quality:voice:gate` in default mode reports misses but does not fail the build
+- when ready to enforce, set `RUBYCRITIC_ENFORCE=1` in CI
+
 ## Event Types
 
 Voice providers normalize payloads into:
