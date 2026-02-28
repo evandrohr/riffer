@@ -73,7 +73,10 @@ See [Providers](../docs_providers/01_PROVIDERS.md) for details.
 
 ### Realtime Voice
 
-Riffer also includes a provider-neutral realtime voice subsystem (`Riffer::Voice`) with a single session-first API.
+Riffer also includes a provider-neutral realtime voice subsystem (`Riffer::Voice`) with:
+
+- a session-first API (`Riffer::Voice.connect`)
+- an optional orchestration layer (`Riffer::Voice::Agent`)
 
 ```ruby
 session = Riffer::Voice.connect(
@@ -82,7 +85,7 @@ session = Riffer::Voice.connect(
 )
 ```
 
-Voice sessions are separate from `Riffer::Agent` text generation and consume typed events via `session.events` or `session.next_event`.
+Voice sessions are separate from `Riffer::Agent` text generation and consume typed events via `session.events` or `session.next_event`. `Riffer::Voice::Agent` builds on top of sessions and can auto-handle voice tool calls.
 
 See [Realtime Voice](10_REALTIME_VOICE.md) for details.
 

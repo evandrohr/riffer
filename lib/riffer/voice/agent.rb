@@ -1,0 +1,260 @@
+# frozen_string_literal: true
+# rbs_inline: enabled
+
+# High-level orchestration wrapper for realtime voice sessions.
+#
+# Riffer::Voice::Agent keeps Riffer::Voice::Session as a low-level transport API
+# and adds optional automatic tool-call execution using Riffer::Tool classes.
+#
+#   class SupportVoiceAgent < Riffer::Voice::Agent
+#     model "openai/gpt-realtime-1.5"
+#     instructions "You are a concise support assistant."
+#     uses_tools [LookupAccountTool]
+#   end
+#
+#   agent = SupportVoiceAgent.connect(runtime: :auto)
+#   agent.send_text_turn(text: "Hello")
+#   agent.events.each do |event|
+#     puts event.class.name
+#   end
+#
+class Riffer::Voice::Agent
+  extend Riffer::Helpers::Validations
+
+  # Connected voice session.
+  attr_reader :session #: Riffer::Voice::Session?
+
+  # Tool execution context passed to Riffer::Tool#call.
+  attr_accessor :tool_context #: Hash[Symbol, untyped]?
+
+  #: (?(String | Proc)?) -> (String | Proc)?
+  def self.model(model_string_or_proc = nil)
+    return @model if model_string_or_proc.nil?
+
+    if model_string_or_proc.is_a?(Proc)
+      @model = model_string_or_proc
+    else
+      validate_is_string!(model_string_or_proc, "model")
+      @model = model_string_or_proc
+    end
+  end
+
+  #: (?String?) -> String?
+  def self.instructions(instructions_text = nil)
+    return @instructions if instructions_text.nil?
+    validate_is_string!(instructions_text, "instructions")
+    @instructions = instructions_text
+  end
+
+  #: (?(Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]] | Proc)?) -> (Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]] | Proc)?
+  def self.uses_tools(tools_or_lambda = nil)
+    return @tools_config if tools_or_lambda.nil?
+    @tools_config = tools_or_lambda
+  end
+
+  #: (**untyped) -> Riffer::Voice::Agent
+  def self.connect(**kwargs)
+    tool_context = kwargs.delete(:tool_context)
+    auto_handle_tool_calls = kwargs.delete(:auto_handle_tool_calls)
+    init_options = {tool_context: tool_context}
+    init_options[:auto_handle_tool_calls] = auto_handle_tool_calls unless auto_handle_tool_calls.nil?
+    agent = new(**init_options)
+    agent.connect(**kwargs)
+    agent
+  end
+
+  #: (?tool_context: Hash[Symbol, untyped]?, ?auto_handle_tool_calls: bool) -> void
+  def initialize(tool_context: nil, auto_handle_tool_calls: true)
+    @tool_context = tool_context
+    @auto_handle_tool_calls = auto_handle_tool_calls
+    @model_config = self.class.model
+    @instructions_text = self.class.instructions
+    @tools_config = self.class.uses_tools
+    @connected_tools = [] #: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]
+    @session = nil
+  end
+
+  #: (?model: String?, ?system_prompt: String?, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]?, ?config: Hash[Symbol | String, untyped], ?runtime: Symbol, ?adapter_factory: ^(adapter_identifier: Symbol, model: String, runtime_executor: (Riffer::Voice::Runtime::ManagedAsync | Riffer::Voice::Runtime::BackgroundAsync)) -> untyped) -> self
+  def connect(model: nil, system_prompt: nil, tools: nil, config: {}, runtime: :auto, adapter_factory: nil)
+    close if @session && !@session.closed?
+
+    resolved_model = resolve_model(model)
+    resolved_system_prompt = resolve_system_prompt(system_prompt)
+    resolved_tools = resolve_tools(tools)
+
+    @session = Riffer::Voice.connect(
+      model: resolved_model,
+      system_prompt: resolved_system_prompt,
+      tools: resolved_tools,
+      config: config,
+      runtime: runtime,
+      adapter_factory: adapter_factory
+    )
+    @connected_tools = resolved_tools
+    self
+  end
+
+  #: () -> bool
+  def connected?
+    @session&.connected? == true
+  end
+
+  #: () -> bool
+  def closed?
+    @session.nil? || @session.closed?
+  end
+
+  #: () -> Symbol
+  def runtime_kind
+    current_session.runtime_kind
+  end
+
+  #: (text: String) -> bool
+  def send_text_turn(text:)
+    current_session.send_text_turn(text: text)
+  end
+
+  #: (payload: String, mime_type: String) -> bool
+  def send_audio_chunk(payload:, mime_type:)
+    current_session.send_audio_chunk(payload: payload, mime_type: mime_type)
+  end
+
+  #: (call_id: String, result: untyped) -> bool
+  def send_tool_response(call_id:, result:)
+    current_session.send_tool_response(call_id: call_id, result: result)
+  end
+
+  #: (?timeout: Numeric?, ?auto_handle_tool_calls: bool) -> Riffer::Voice::Events::Base?
+  def next_event(timeout: nil, auto_handle_tool_calls: @auto_handle_tool_calls)
+    event = current_session.next_event(timeout: timeout)
+    return nil if event.nil?
+
+    handle_tool_call_event(event) if auto_handle_tool_calls
+    event
+  end
+
+  #: (?auto_handle_tool_calls: bool) -> Enumerator[Riffer::Voice::Events::Base, void]
+  def events(auto_handle_tool_calls: @auto_handle_tool_calls)
+    Enumerator.new do |yielder|
+      current_session.events.each do |event|
+        handle_tool_call_event(event) if auto_handle_tool_calls
+        yielder << event
+      end
+    end
+  end
+
+  #: () -> void
+  def close
+    return if @session.nil?
+
+    @session.close
+  end
+
+  private
+
+  #: () -> Riffer::Voice::Session
+  def current_session
+    session = @session
+    raise Riffer::Error, "Voice agent is not connected" if session.nil?
+
+    session
+  end
+
+  #: (Riffer::Voice::Events::Base) -> void
+  def handle_tool_call_event(event)
+    return unless event.is_a?(Riffer::Voice::Events::ToolCall)
+
+    result = execute_tool_call(event)
+    current_session.send_tool_response(call_id: event.call_id, result: serialize_tool_result(result))
+  end
+
+  #: (Riffer::Voice::Events::ToolCall) -> Riffer::Tools::Response
+  def execute_tool_call(tool_call_event)
+    tool_class = find_tool_class(tool_call_event.name)
+
+    if tool_class.nil?
+      return Riffer::Tools::Response.error(
+        "Unknown tool '#{tool_call_event.name}'",
+        type: :unknown_tool
+      )
+    end
+
+    tool_instance = tool_class.new
+    arguments = parse_tool_arguments(tool_call_event.arguments_hash)
+
+    begin
+      tool_instance.call_with_validation(context: @tool_context, **arguments)
+    rescue Riffer::TimeoutError => e
+      Riffer::Tools::Response.error(e.message, type: :timeout_error)
+    rescue Riffer::ValidationError => e
+      Riffer::Tools::Response.error(e.message, type: :validation_error)
+    rescue => e
+      Riffer::Tools::Response.error("Error executing tool: #{e.message}", type: :execution_error)
+    end
+  end
+
+  #: (Riffer::Tools::Response) -> (String | Hash[String, untyped])
+  def serialize_tool_result(result)
+    return result.content unless result.error?
+
+    {
+      "content" => result.content,
+      "error" => {
+        "type" => result.error_type.to_s,
+        "message" => result.error_message
+      }
+    }
+  end
+
+  #: (String) -> singleton(Riffer::Tool)?
+  def find_tool_class(name)
+    @connected_tools.find do |tool|
+      tool.is_a?(Class) && tool <= Riffer::Tool && tool.name == name
+    end
+  end
+
+  #: (Hash[String, untyped]) -> Hash[Symbol, untyped]
+  def parse_tool_arguments(arguments)
+    return {} if arguments.empty?
+
+    arguments.each_with_object({}) do |(key, value), result|
+      result[key.to_sym] = value
+    end
+  end
+
+  #: (String?) -> String
+  def resolve_model(model_override)
+    return model_override if model_override
+
+    config = @model_config
+    if config.is_a?(Proc)
+      return (config.arity == 0) ? config.call : config.call(@tool_context)
+    end
+
+    return config if config
+
+    raise Riffer::ArgumentError, "model must be provided or configured via .model"
+  end
+
+  #: (String?) -> String
+  def resolve_system_prompt(system_prompt_override)
+    return system_prompt_override if system_prompt_override
+    return @instructions_text if @instructions_text
+
+    raise Riffer::ArgumentError, "system_prompt must be provided or configured via .instructions"
+  end
+
+  #: (Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]?) -> Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]
+  def resolve_tools(tools_override)
+    return tools_override if tools_override
+
+    config = @tools_config
+    return [] if config.nil?
+
+    if config.is_a?(Proc)
+      return (config.arity == 0) ? config.call : config.call(@tool_context)
+    end
+
+    config
+  end
+end

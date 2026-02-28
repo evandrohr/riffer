@@ -6,6 +6,7 @@ Use one public entry point:
 
 - `Riffer::Voice.connect(...)`
 - `Riffer::Voice::Session` for send/receive/close lifecycle
+- `Riffer::Voice::Agent` for optional session orchestration + automatic tool execution
 - typed events under `Riffer::Voice::Events::*`
 
 ## Runtime Dependencies
@@ -59,6 +60,57 @@ Voice models must use `provider/model` format:
 3. `send_tool_response(call_id:, result:)`
 4. `events` (Enumerator) and `next_event(timeout:)`
 5. `close`
+
+## Voice Agent (Optional Orchestration)
+
+`Riffer::Voice::Agent` wraps `Riffer::Voice::Session` and can automatically execute
+`Riffer::Tool` calls emitted as `Riffer::Voice::Events::ToolCall`.
+
+```ruby
+class LookupWeatherTool < Riffer::Tool
+  identifier "lookup_weather"
+  description "Looks up weather for a city"
+
+  params do
+    required :city, String
+  end
+
+  def call(context:, city:)
+    text("The weather in #{city} is sunny.")
+  end
+end
+
+class SupportVoiceAgent < Riffer::Voice::Agent
+  model "openai/gpt-realtime-1.5"
+  instructions "You are a concise voice assistant."
+  uses_tools [LookupWeatherTool]
+end
+
+agent = SupportVoiceAgent.connect(runtime: :auto, tool_context: {account_id: "acct_123"})
+
+begin
+  agent.send_text_turn(text: "What's the weather in Toronto?")
+
+  agent.events.each do |event|
+    case event
+    when Riffer::Voice::Events::OutputTranscript
+      puts "[assistant] #{event.text}"
+    when Riffer::Voice::Events::TurnComplete
+      break
+    end
+  end
+ensure
+  agent.close
+end
+```
+
+Notes:
+
+- `Riffer::Voice::Agent` keeps the underlying `session` available.
+- Automatic tool handling can be disabled per read:
+  - `agent.next_event(auto_handle_tool_calls: false)`
+  - `agent.events(auto_handle_tool_calls: false)`
+- Tool errors (unknown tool, validation, timeout, execution) are sent back through `send_tool_response`.
 
 ## Validation and Error Behavior
 
