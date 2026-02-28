@@ -31,7 +31,7 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 | VA6 | Run helpers + lifecycle semantics | DONE | Riffer maintainers | `run_loop`, `run_until_turn_complete`, `drain_available_events` |
 | VA7 | Durability hooks | DONE | Riffer maintainers | checkpoint callbacks + snapshot export/import for app-managed resume |
 | VA8 | Docs/examples/migration guidance | DONE | Riffer maintainers | Session-vs-Agent guidance + migration snippets + responsibility boundaries |
-| VA9 | Test matrix + final QA | PLANNED | Riffer maintainers | runtime/tool/profile/policy/durability matrix and suite verification |
+| VA9 | Test matrix + final QA | DONE | Riffer maintainers | matrix coverage completed + full quality gates green |
 
 ## Task Checklist
 
@@ -45,8 +45,8 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 - [x] Add helper methods for common event loops.
 - [x] Add snapshot/checkpoint hooks for durability integration.
 - [x] Add migration examples from manual session loops.
-- [ ] Expand tests for async/background runtime matrix.
-- [ ] Run full quality gates and record results.
+- [x] Expand tests for async/background runtime matrix.
+- [x] Run full quality gates and record results.
 
 ## Decisions Log
 
@@ -70,6 +70,8 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 
 | Date | Command | Result | Notes |
 | --- | --- | --- | --- |
+| 2026-02-28 | `RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake` | Pass | VA9 final gate (`1193 runs, 0 failures`) + `steep` type checks |
+| 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/agent_test.rb` | Pass | VA9 matrix additions (`45 runs, 0 failures`) |
 | 2026-02-28 | `RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake standard` | Pass | VA8 docs pass (no style regressions) |
 | 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/agent_test.rb` | Pass | VA7 durability coverage added (`44 runs, 0 failures`) |
 | 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/session_test.rb` | Pass | regression check after VA7 durability hooks |
@@ -105,6 +107,19 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 ## Session Change Log (Newest First)
 
 ## 2026-02-28
+
+- Completed VA9 (`Test matrix + final QA`) with:
+  - expanded `Voice::Agent` test matrix coverage:
+    - runtime behavior (`:background` and `:async` validation path)
+    - tool execution outcomes (success, unknown, validation, policy/budget)
+    - profile overrides and safety defaults
+    - durability checkpoints + snapshot import/export
+  - executed final quality gates:
+    - `bundle exec rake` with workspace rubocop cache override
+    - full test suite green
+    - `steep` type checks green
+- Next step:
+  - implementation plan complete (`VA1` to `VA9` delivered).
 
 - Completed VA8 (`Docs/examples/migration guidance`) with:
   - added explicit "Session vs Voice Agent" guidance in `docs/10_REALTIME_VOICE.md`.

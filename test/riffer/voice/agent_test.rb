@@ -1040,4 +1040,16 @@ describe Riffer::Voice::Agent do
     }.must_raise Riffer::ArgumentError
     expect(error.message).must_equal "snapshot tool_call_count must be an Integer >= 0"
   end
+
+  it "requires async context when runtime :async is requested" do
+    async_agent = TestSupport::Voice::SupportVoiceAgent.new
+
+    error = expect {
+      async_agent.connect(runtime: :async, adapter_factory: ->(**_kwargs) { TestSupport::Voice::FakeAdapter.new })
+    }.must_raise Riffer::ArgumentError
+
+    expect(error.message).must_include "runtime :async requires an active Async task context"
+  ensure
+    async_agent.close unless async_agent.nil? || async_agent.closed?
+  end
 end

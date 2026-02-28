@@ -2,7 +2,7 @@
 
 Date: 2026-02-28  
 Owner: Riffer maintainers  
-Status: Planned
+Status: Completed (VA1-VA9 delivered on 2026-02-28)
 
 ## Objective
 
