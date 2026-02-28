@@ -24,7 +24,7 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 | ID | Milestone | Status | Owner | Notes |
 | --- | --- | --- | --- | --- |
 | VA1 | API + DSL hardening | DONE | Riffer maintainers | added runtime/config/auto-tool defaults + precedence/validation coverage |
-| VA2 | Callback registry + event router | PLANNED | Riffer maintainers | `on_event` + typed callbacks with guarded dispatch |
+| VA2 | Callback registry + event router | DONE | Riffer maintainers | `on_event` + typed callbacks with deterministic failure policy |
 | VA3 | Tool execution pipeline + hooks | PLANNED | Riffer maintainers | pluggable executor and hook points |
 | VA4 | Role profiles | PLANNED | Riffer maintainers | Notion-inspired role-like config bundles in core DSL |
 | VA5 | Policy gates + action budgets | PLANNED | Riffer maintainers | generic guard hooks for mutation/action control |
@@ -36,8 +36,8 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 ## Task Checklist
 
 - [x] Add class-level default runtime/voice config/auto-tool settings.
-- [ ] Add callback registration API for all voice event types.
-- [ ] Add callback failure handling contract and tests.
+- [x] Add callback registration API for all voice event types.
+- [x] Add callback failure handling contract and tests.
 - [ ] Add custom tool executor injection contract.
 - [ ] Add before/after/on-error tool execution hooks.
 - [ ] Add profile DSL and profile-aware connect path.
@@ -70,6 +70,10 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 
 | Date | Command | Result | Notes |
 | --- | --- | --- | --- |
+| 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/agent_test.rb` | Pass | VA2 callback coverage added (`20 runs, 0 failures`) |
+| 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/session_test.rb` | Pass | regression check after VA2 callback router |
+| 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/connect_validation_test.rb` | Pass | connect/validation behavior preserved |
+| 2026-02-28 | `RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake standard` | Pass | VA2 lint pass |
 | 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/agent_test.rb` | Pass | VA1 expanded coverage (`15 runs, 0 failures`) |
 | 2026-02-28 | `RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake standard` | Pass | VA1 lint pass |
 | 2026-02-28 | `bundle exec ruby -Ilib:test test/riffer/voice/agent_test.rb` | Pass | baseline Voice Agent tests |
@@ -80,6 +84,26 @@ Scope: Full implementation of `Riffer::Voice::Agent` in `riffer`
 ## Session Change Log (Newest First)
 
 ## 2026-02-28
+
+- Completed VA2 (`Callback registry + event router`) with:
+  - callback registration API in `Riffer::Voice::Agent`:
+    - `on_event`
+    - `on_audio_chunk`
+    - `on_input_transcript`
+    - `on_output_transcript`
+    - `on_tool_call`
+    - `on_interrupt`
+    - `on_turn_complete`
+    - `on_usage`
+    - `on_error`
+  - callback dispatch integrated in both `next_event` and `events`.
+  - deterministic callback failure contract:
+    - callback exceptions raise `Riffer::Error` with callback key + event class context.
+  - expanded tests in `test/riffer/voice/agent_test.rb` for callback registration, dispatch, and failure behavior.
+- Updated docs:
+  - `docs/10_REALTIME_VOICE.md` (Voice Agent callbacks section)
+- Next step:
+  - execute VA3 from `docs/voice-agent-implementation-plan.md`.
 
 - Completed VA1 (`API + DSL hardening`) with:
   - class DSL defaults in `Riffer::Voice::Agent`:

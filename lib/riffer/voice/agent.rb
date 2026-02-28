@@ -27,6 +27,18 @@ class Riffer::Voice::Agent
   # Tool execution context passed to Riffer::Tool#call.
   attr_accessor :tool_context #: Hash[Symbol, untyped]?
 
+  CALLBACK_KEYS = [
+    :on_event,
+    :on_audio_chunk,
+    :on_input_transcript,
+    :on_output_transcript,
+    :on_tool_call,
+    :on_interrupt,
+    :on_turn_complete,
+    :on_usage,
+    :on_error
+  ].freeze
+
   #: (?(String | Proc)?) -> (String | Proc)?
   def self.model(model_string_or_proc = nil)
     return @model if model_string_or_proc.nil?
@@ -115,6 +127,7 @@ class Riffer::Voice::Agent
     @runtime_config = self.class.runtime
     @voice_config = self.class.voice_config
     @connected_tools = [] #: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]
+    @event_callbacks = default_event_callbacks #: Hash[Symbol, Array[^(Riffer::Voice::Events::Base) -> void]]
     @session = nil
   end
 
@@ -155,6 +168,69 @@ class Riffer::Voice::Agent
     current_session.runtime_kind
   end
 
+  # Registers a callback invoked for every consumed voice event.
+  #
+  #: () { (Riffer::Voice::Events::Base) -> void } -> self
+  def on_event(&block)
+    register_event_callback(:on_event, &block)
+  end
+
+  # Registers a callback invoked for audio chunk events.
+  #
+  #: () { (Riffer::Voice::Events::AudioChunk) -> void } -> self
+  def on_audio_chunk(&block)
+    register_event_callback(:on_audio_chunk, &block)
+  end
+
+  # Registers a callback invoked for input transcript events.
+  #
+  #: () { (Riffer::Voice::Events::InputTranscript) -> void } -> self
+  def on_input_transcript(&block)
+    register_event_callback(:on_input_transcript, &block)
+  end
+
+  # Registers a callback invoked for output transcript events.
+  #
+  #: () { (Riffer::Voice::Events::OutputTranscript) -> void } -> self
+  def on_output_transcript(&block)
+    register_event_callback(:on_output_transcript, &block)
+  end
+
+  # Registers a callback invoked for tool-call events.
+  #
+  #: () { (Riffer::Voice::Events::ToolCall) -> void } -> self
+  def on_tool_call(&block)
+    register_event_callback(:on_tool_call, &block)
+  end
+
+  # Registers a callback invoked for interruption events.
+  #
+  #: () { (Riffer::Voice::Events::Interrupt) -> void } -> self
+  def on_interrupt(&block)
+    register_event_callback(:on_interrupt, &block)
+  end
+
+  # Registers a callback invoked for turn-complete events.
+  #
+  #: () { (Riffer::Voice::Events::TurnComplete) -> void } -> self
+  def on_turn_complete(&block)
+    register_event_callback(:on_turn_complete, &block)
+  end
+
+  # Registers a callback invoked for usage events.
+  #
+  #: () { (Riffer::Voice::Events::Usage) -> void } -> self
+  def on_usage(&block)
+    register_event_callback(:on_usage, &block)
+  end
+
+  # Registers a callback invoked for error events.
+  #
+  #: () { (Riffer::Voice::Events::Error) -> void } -> self
+  def on_error(&block)
+    register_event_callback(:on_error, &block)
+  end
+
   #: (text: String) -> bool
   def send_text_turn(text:)
     current_session.send_text_turn(text: text)
@@ -175,16 +251,14 @@ class Riffer::Voice::Agent
     event = current_session.next_event(timeout: timeout)
     return nil if event.nil?
 
-    handle_tool_call_event(event) if auto_handle_tool_calls
-    event
+    consume_event(event, auto_handle_tool_calls: auto_handle_tool_calls)
   end
 
   #: (?auto_handle_tool_calls: bool) -> Enumerator[Riffer::Voice::Events::Base, void]
   def events(auto_handle_tool_calls: @auto_handle_tool_calls)
     Enumerator.new do |yielder|
       current_session.events.each do |event|
-        handle_tool_call_event(event) if auto_handle_tool_calls
-        yielder << event
+        yielder << consume_event(event, auto_handle_tool_calls: auto_handle_tool_calls)
       end
     end
   end
@@ -206,12 +280,66 @@ class Riffer::Voice::Agent
     session
   end
 
+  #: (Riffer::Voice::Events::Base, auto_handle_tool_calls: bool) -> Riffer::Voice::Events::Base
+  def consume_event(event, auto_handle_tool_calls:)
+    handle_tool_call_event(event) if auto_handle_tool_calls
+    dispatch_event_callbacks(event)
+    event
+  end
+
   #: (Riffer::Voice::Events::Base) -> void
   def handle_tool_call_event(event)
     return unless event.is_a?(Riffer::Voice::Events::ToolCall)
 
     result = execute_tool_call(event)
     current_session.send_tool_response(call_id: event.call_id, result: serialize_tool_result(result))
+  end
+
+  #: (Symbol) { (Riffer::Voice::Events::Base) -> void } -> self
+  def register_event_callback(callback_key, &block)
+    raise Riffer::ArgumentError, "#{callback_key} requires a block" unless block_given?
+
+    @event_callbacks.fetch(callback_key) << block
+    self
+  end
+
+  #: (Riffer::Voice::Events::Base) -> void
+  def dispatch_event_callbacks(event)
+    safely_invoke_callbacks(:on_event, event)
+    callback_key = callback_key_for(event)
+    safely_invoke_callbacks(callback_key, event) if callback_key
+  end
+
+  #: (Symbol, Riffer::Voice::Events::Base) -> void
+  def safely_invoke_callbacks(callback_key, event)
+    @event_callbacks.fetch(callback_key).each do |callback|
+      callback.call(event)
+    end
+  rescue => error
+    raise Riffer::Error,
+      "#{callback_key} callback failed for #{event.class.name}: #{error.class}: #{error.message}"
+  end
+
+  #: (Riffer::Voice::Events::Base) -> Symbol?
+  def callback_key_for(event)
+    case event
+    when Riffer::Voice::Events::AudioChunk
+      :on_audio_chunk
+    when Riffer::Voice::Events::InputTranscript
+      :on_input_transcript
+    when Riffer::Voice::Events::OutputTranscript
+      :on_output_transcript
+    when Riffer::Voice::Events::ToolCall
+      :on_tool_call
+    when Riffer::Voice::Events::Interrupt
+      :on_interrupt
+    when Riffer::Voice::Events::TurnComplete
+      :on_turn_complete
+    when Riffer::Voice::Events::Usage
+      :on_usage
+    when Riffer::Voice::Events::Error
+      :on_error
+    end
   end
 
   #: (Riffer::Voice::Events::ToolCall) -> Riffer::Tools::Response
@@ -358,6 +486,13 @@ class Riffer::Voice::Agent
     end
   end
   private_class_method :deep_copy
+
+  #: () -> Hash[Symbol, Array[^(Riffer::Voice::Events::Base) -> void]]
+  def default_event_callbacks
+    CALLBACK_KEYS.each_with_object({}) do |callback_key, callbacks|
+      callbacks[callback_key] = []
+    end
+  end
 
   #: (untyped) -> untyped
   def deep_copy(value)

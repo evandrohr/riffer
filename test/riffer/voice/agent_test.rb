@@ -163,6 +163,68 @@ describe Riffer::Voice::Agent do
     expect(adapter.tool_responses).must_equal([{call_id: "call-5", result: "voice: stream"}])
   end
 
+  it "dispatches on_event and typed callbacks for next_event" do
+    seen = []
+    agent.on_event { |event| seen << [:on_event, event.class.name] }
+    agent.on_output_transcript { |event| seen << [:on_output_transcript, event.text] }
+    event = Riffer::Voice::Events::OutputTranscript.new(text: "hello from assistant")
+    adapter.emit(event)
+
+    received = agent.next_event(timeout: 0)
+
+    expect(received).must_equal event
+    expect(seen).must_equal([
+      [:on_event, "Riffer::Voice::Events::OutputTranscript"],
+      [:on_output_transcript, "hello from assistant"]
+    ])
+  end
+
+  it "dispatches typed callbacks while iterating events enumerator" do
+    seen = []
+    agent.on_turn_complete { |_event| seen << :on_turn_complete }
+    done_event = Riffer::Voice::Events::TurnComplete.new
+    adapter.emit(done_event)
+
+    agent.events.each do |event|
+      break if event == done_event
+    end
+
+    expect(seen).must_equal([:on_turn_complete])
+  end
+
+  it "dispatches on_error callbacks for error events" do
+    seen_codes = []
+    agent.on_error { |event| seen_codes << event.code }
+    error_event = Riffer::Voice::Events::Error.new(code: "provider_timeout", message: "try again")
+    adapter.emit(error_event)
+
+    received = agent.next_event(timeout: 0)
+
+    expect(received).must_equal error_event
+    expect(seen_codes).must_equal(["provider_timeout"])
+  end
+
+  it "raises deterministic errors when a callback fails" do
+    agent.on_output_transcript { |_event| raise "boom" }
+    adapter.emit(Riffer::Voice::Events::OutputTranscript.new(text: "x"))
+
+    error = expect {
+      agent.next_event(timeout: 0)
+    }.must_raise Riffer::Error
+
+    expect(error.message).must_equal(
+      "on_output_transcript callback failed for Riffer::Voice::Events::OutputTranscript: RuntimeError: boom"
+    )
+  end
+
+  it "validates callback registration blocks" do
+    error = expect { agent.on_event }.must_raise Riffer::ArgumentError
+    expect(error.message).must_equal "on_event requires a block"
+
+    error = expect { agent.on_tool_call }.must_raise Riffer::ArgumentError
+    expect(error.message).must_equal "on_tool_call requires a block"
+  end
+
   it "uses class-level runtime and config defaults when connect does not override" do
     configured_adapter = TestSupport::Voice::FakeAdapter.new
     configured_agent = TestSupport::Voice::ConfiguredVoiceAgent.new

@@ -137,6 +137,35 @@ Notes:
 
 `voice_config` is deep-merged with `connect(config: ...)`, where explicit `connect` values win.
 
+### Voice Agent Event Callbacks
+
+`Riffer::Voice::Agent` supports callback registration over normalized typed events:
+
+- `on_event`
+- `on_audio_chunk`
+- `on_input_transcript`
+- `on_output_transcript`
+- `on_tool_call`
+- `on_interrupt`
+- `on_turn_complete`
+- `on_usage`
+- `on_error`
+
+Callbacks are invoked when events are consumed through `next_event` or `events`.
+
+```ruby
+agent = SupportVoiceAgent.connect
+
+agent.on_event { |event| puts "[event] #{event.class.name}" }
+agent.on_tool_call { |event| puts "[tool] #{event.name}" }
+agent.on_error { |event| warn "[voice error] #{event.code}: #{event.message}" }
+```
+
+Callback failure policy is explicit and fail-fast:
+
+- if any callback raises, `Riffer::Error` is raised with callback key and event class context
+- callback errors are never silently dropped
+
 ## Validation and Error Behavior
 
 `Riffer::Voice.connect(...)` validates:
