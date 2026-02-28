@@ -888,4 +888,69 @@ describe Riffer::Voice::Agent do
     }.must_raise Riffer::ArgumentError
     expect(error.message).must_equal "approval_callback must respond to #call"
   end
+
+  it "runs loop until interrupt and yields consumed events" do
+    output_event = Riffer::Voice::Events::OutputTranscript.new(text: "hello")
+    interrupt_event = Riffer::Voice::Events::Interrupt.new(reason: :barge_in)
+    trailing_event = Riffer::Voice::Events::TurnComplete.new
+    adapter.emit(output_event)
+    adapter.emit(interrupt_event)
+    adapter.emit(trailing_event)
+
+    seen = []
+    returned = agent.run_loop do |event|
+      seen << event
+    end
+
+    expect(returned).must_equal agent
+    expect(seen).must_equal([output_event, interrupt_event])
+    remaining = agent.drain_available_events
+    expect(remaining).must_equal([trailing_event])
+  end
+
+  it "run_until_turn_complete sends optional text and stops at turn completion" do
+    loop_agent = TestSupport::Voice::SupportVoiceAgent.new
+    loop_adapter = TestSupport::Voice::FakeAdapter.new
+    loop_agent.connect(runtime: :background, adapter_factory: ->(**_kwargs) { loop_adapter })
+    output_event = Riffer::Voice::Events::OutputTranscript.new(text: "processing")
+    complete_event = Riffer::Voice::Events::TurnComplete.new
+    trailing_event = Riffer::Voice::Events::Usage.new(input_tokens: 1)
+    loop_adapter.emit(output_event)
+    loop_adapter.emit(complete_event)
+    loop_adapter.emit(trailing_event)
+
+    events = loop_agent.run_until_turn_complete(text: "hello")
+
+    expect(loop_adapter.text_turns).must_equal(["hello"])
+    expect(events).must_equal([output_event, complete_event])
+    expect(loop_agent.drain_available_events).must_equal([trailing_event])
+  ensure
+    loop_agent.close unless loop_agent.nil? || loop_agent.closed?
+  end
+
+  it "drains available events with optional max_events limit" do
+    first = Riffer::Voice::Events::OutputTranscript.new(text: "one")
+    second = Riffer::Voice::Events::OutputTranscript.new(text: "two")
+    third = Riffer::Voice::Events::OutputTranscript.new(text: "three")
+    adapter.emit(first)
+    adapter.emit(second)
+    adapter.emit(third)
+
+    first_batch = agent.drain_available_events(max_events: 2)
+    second_batch = agent.drain_available_events
+
+    expect(first_batch).must_equal([first, second])
+    expect(second_batch).must_equal([third])
+  end
+
+  it "validates run helper input contracts" do
+    error = expect { agent.run_loop(timeout: -1) { |_event| nil } }.must_raise Riffer::ArgumentError
+    expect(error.message).must_equal "timeout must be nil or >= 0"
+
+    error = expect { agent.run_until_turn_complete(timeout: -1) }.must_raise Riffer::ArgumentError
+    expect(error.message).must_equal "timeout must be nil or >= 0"
+
+    error = expect { agent.drain_available_events(max_events: 0) }.must_raise Riffer::ArgumentError
+    expect(error.message).must_equal "max_events must be nil or an Integer > 0"
+  end
 end

@@ -438,6 +438,86 @@ class Riffer::Voice::Agent
     end
   end
 
+  # Runs an event loop and yields events until a stop condition is reached.
+  #
+  # Stop conditions:
+  # - timeout reached (when timeout is provided)
+  # - no event is returned within remaining timeout
+  # - agent becomes closed/disconnected
+  # - interrupt event is received
+  #
+  #: (?timeout: Numeric?, ?auto_handle_tool_calls: bool) { (Riffer::Voice::Events::Base) -> void } -> self
+  def run_loop(timeout: nil, auto_handle_tool_calls: @auto_handle_tool_calls, &block)
+    invalid_timeout = !timeout.nil? && (!timeout.is_a?(Numeric) || timeout < 0)
+    raise Riffer::ArgumentError, "timeout must be nil or >= 0" if invalid_timeout
+    return enum_for(:run_loop, timeout: timeout, auto_handle_tool_calls: auto_handle_tool_calls) unless block_given?
+
+    deadline = timeout.nil? ? nil : monotonic_time + timeout
+
+    loop do
+      break if closed? || !connected?
+
+      next_timeout = remaining_timeout(deadline)
+      break if !deadline.nil? && next_timeout <= 0
+
+      event = next_event(timeout: next_timeout, auto_handle_tool_calls: auto_handle_tool_calls)
+      break if event.nil?
+
+      yield event
+      break if event.is_a?(Riffer::Voice::Events::Interrupt)
+    end
+
+    self
+  end
+
+  # Sends optional input text and consumes events until turn completion or stop.
+  #
+  #: (?text: String?, ?timeout: Numeric?, ?auto_handle_tool_calls: bool) -> Array[Riffer::Voice::Events::Base]
+  def run_until_turn_complete(text: nil, timeout: nil, auto_handle_tool_calls: @auto_handle_tool_calls)
+    invalid_timeout = !timeout.nil? && (!timeout.is_a?(Numeric) || timeout < 0)
+    raise Riffer::ArgumentError, "timeout must be nil or >= 0" if invalid_timeout
+
+    send_text_turn(text: text) unless text.nil?
+
+    collected = []
+    deadline = timeout.nil? ? nil : monotonic_time + timeout
+
+    loop do
+      break if closed? || !connected?
+
+      next_timeout = remaining_timeout(deadline)
+      break if !deadline.nil? && next_timeout <= 0
+
+      event = next_event(timeout: next_timeout, auto_handle_tool_calls: auto_handle_tool_calls)
+      break if event.nil?
+
+      collected << event
+      break if event.is_a?(Riffer::Voice::Events::TurnComplete) || event.is_a?(Riffer::Voice::Events::Interrupt)
+    end
+
+    collected
+  end
+
+  # Drains currently available events without blocking.
+  #
+  #: (?max_events: Integer?, ?auto_handle_tool_calls: bool) -> Array[Riffer::Voice::Events::Base]
+  def drain_available_events(max_events: nil, auto_handle_tool_calls: @auto_handle_tool_calls)
+    invalid_max_events = !max_events.nil? && (!max_events.is_a?(Integer) || max_events <= 0)
+    raise Riffer::ArgumentError, "max_events must be nil or an Integer > 0" if invalid_max_events
+
+    drained = []
+    loop do
+      break if !max_events.nil? && drained.length >= max_events
+
+      event = next_event(timeout: 0, auto_handle_tool_calls: auto_handle_tool_calls)
+      break if event.nil?
+
+      drained << event
+    end
+
+    drained
+  end
+
   #: () -> void
   def close
     return if @session.nil?
@@ -453,6 +533,19 @@ class Riffer::Voice::Agent
     raise Riffer::Error, "Voice agent is not connected" if session.nil?
 
     session
+  end
+
+  #: () -> Float
+  def monotonic_time
+    Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  end
+
+  #: (Float?) -> Numeric?
+  def remaining_timeout(deadline)
+    return nil if deadline.nil?
+
+    remaining = deadline - monotonic_time
+    remaining.negative? ? 0 : remaining
   end
 
   #: (Riffer::Voice::Events::Base, auto_handle_tool_calls: bool) -> Riffer::Voice::Events::Base

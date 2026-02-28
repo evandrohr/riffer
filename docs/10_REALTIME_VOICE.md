@@ -269,6 +269,31 @@ Policy outcomes are serialized into typed tool errors when blocked:
 - `approval_denied`
 - `approval_error`
 
+### Voice Agent Run Helpers
+
+`Riffer::Voice::Agent` includes helpers to reduce manual event-loop boilerplate:
+
+- `run_loop(timeout:) { |event| ... }`
+- `run_until_turn_complete(text:, timeout:)`
+- `drain_available_events(max_events:)`
+
+```ruby
+events = agent.run_until_turn_complete(text: "Help me reset my password", timeout: 10)
+
+agent.run_loop(timeout: 5) do |event|
+  break if event.is_a?(Riffer::Voice::Events::TurnComplete)
+end
+
+pending = agent.drain_available_events(max_events: 20)
+```
+
+Run-loop stop conditions:
+
+- timeout reached (when provided)
+- disconnected/closed session
+- `Interrupt` event (for `run_loop`)
+- `TurnComplete` or `Interrupt` event (for `run_until_turn_complete`)
+
 ## Validation and Error Behavior
 
 `Riffer::Voice.connect(...)` validates:
