@@ -23,6 +23,8 @@ describe Riffer::Voice::Drivers::GeminiLive do
     expect(driver).must_be :connected?
     expect(transport.writes.first.dig("setup", "model")).must_equal "models/gemini-2.5-flash-native-audio-preview-12-2025"
     expect(transport.writes.first.dig("setup", "generationConfig", "responseModalities")).must_equal ["AUDIO"]
+    expect(transport.writes.first.dig("setup", "inputAudioTranscription")).must_equal({})
+    expect(transport.writes.first.dig("setup", "outputAudioTranscription")).must_equal({})
     expect(async_task.children.size).must_equal 1
   end
 
@@ -185,12 +187,17 @@ describe Riffer::Voice::Drivers::GeminiLive do
         generationConfig: {
           responseModalities: ["TEXT"],
           temperature: 0.2
+        },
+        inputAudioTranscription: {
+          languageCode: "en-US"
         }
       }
     )
 
     expect(transport.writes.first.dig("setup", "generationConfig", "responseModalities")).must_equal ["TEXT"]
     expect(transport.writes.first.dig("setup", "generationConfig", "temperature")).must_equal 0.2
+    expect(transport.writes.first.dig("setup", "inputAudioTranscription", "languageCode")).must_equal "en-US"
+    expect(transport.writes.first.dig("setup", "outputAudioTranscription")).must_equal({})
   end
 
   it "removes unsupported schema keys from tool definitions" do

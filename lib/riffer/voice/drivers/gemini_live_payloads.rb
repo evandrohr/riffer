@@ -65,7 +65,9 @@ module Riffer::Voice::Drivers::GeminiLivePayloads
       {
         "generationConfig" => {
           "responseModalities" => Riffer::Voice::Drivers::GeminiLive::DEFAULT_RESPONSE_MODALITIES.dup
-        }
+        },
+        "inputAudioTranscription" => {},
+        "outputAudioTranscription" => {}
       },
       deep_stringify(config || {})
     )

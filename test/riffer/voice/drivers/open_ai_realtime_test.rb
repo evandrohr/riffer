@@ -36,6 +36,9 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
     expect(transport.writes.first.dig("session", "output_audio_format")).must_be_nil
     expect(transport.writes.first.dig("session", "audio", "input", "format", "type")).must_equal "audio/pcm"
     expect(transport.writes.first.dig("session", "audio", "input", "format", "rate")).must_equal 24_000
+    expect(transport.writes.first.dig("session", "audio", "input", "transcription", "model")).must_equal(
+      Riffer::Voice::Drivers::OpenAIRealtime::DEFAULT_INPUT_TRANSCRIPTION_MODEL
+    )
     expect(transport.writes.first.dig("session", "audio", "input", "turn_detection", "type")).must_equal "semantic_vad"
     expect(transport.writes.first.dig("session", "audio", "input", "turn_detection", "create_response")).must_equal true
     expect(transport.writes.first.dig("session", "audio", "input", "turn_detection", "interrupt_response")).must_equal false
@@ -157,6 +160,36 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
     expect(transport.writes.first.dig("session", "audio", "output", "voice")).must_equal "verse"
     expect(transport.writes.first.dig("session", "audio", "output", "format", "type")).must_equal "audio/pcm"
     expect(transport.writes.first.dig("session", "audio", "output", "format", "rate")).must_equal 24_000
+    expect(transport.writes.first.dig("session", "audio", "input", "transcription", "model")).must_equal(
+      Riffer::Voice::Drivers::OpenAIRealtime::DEFAULT_INPUT_TRANSCRIPTION_MODEL
+    )
+  end
+
+  it "allows overriding input transcription config" do
+    transport = VoiceDriverTestHelpers::FakeTransport.new
+
+    driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
+      api_key: "openai-key",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
+      transport_factory: ->(url:, headers:) { transport },
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    driver.connect(
+      system_prompt: "You are helpful",
+      config: {
+        audio: {
+          input: {
+            transcription: {
+              model: "whisper-1"
+            }
+          }
+        }
+      }
+    )
+
+    expect(transport.writes.first.dig("session", "audio", "input", "transcription", "model")).must_equal "whisper-1"
   end
 
   it "emits parser events from the reader loop" do

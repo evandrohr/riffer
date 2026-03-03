@@ -25,6 +25,8 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
   DEFAULT_AUDIO_SAMPLE_RATE = 24_000 #: Integer
   SAMPLE_RATE_CACHE_LIMIT = 32 #: Integer
 
+  DEFAULT_INPUT_TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe" #: String
+
   DEFAULT_OUTPUT_VOICE = "alloy" #: String
 
   DEFAULT_OUTPUT_MODALITIES = ["audio"].freeze #: Array[String]

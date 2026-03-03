@@ -17,6 +17,9 @@ module Riffer::Voice::Drivers::OpenaiRealtimeSessionConfig
             "type" => Riffer::Voice::Drivers::OpenAIRealtime::DEFAULT_AUDIO_FORMAT_TYPE,
             "rate" => Riffer::Voice::Drivers::OpenAIRealtime::DEFAULT_AUDIO_SAMPLE_RATE
           },
+          "transcription" => {
+            "model" => Riffer::Voice::Drivers::OpenAIRealtime::DEFAULT_INPUT_TRANSCRIPTION_MODEL
+          },
           "turn_detection" => {
             "type" => "semantic_vad",
             "create_response" => true,
