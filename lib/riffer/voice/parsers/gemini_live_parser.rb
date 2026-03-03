@@ -12,6 +12,7 @@ class Riffer::Voice::Parsers::GeminiLiveParser < Riffer::Voice::Parsers::Base
   KEYS_INPUT_TRANSCRIPTION = ["inputTranscription", "input_transcription"].freeze #: Array[String]
   KEYS_OUTPUT_TRANSCRIPTION = ["outputTranscription", "output_transcription"].freeze #: Array[String]
   KEYS_TEXT_TRANSCRIPT = ["text", "transcript"].freeze #: Array[String]
+  KEYS_PARTS = ["parts"].freeze #: Array[String]
   KEYS_IS_FINAL = ["isFinal", "final", "finished"].freeze #: Array[String]
   KEYS_TOOL_CALL = ["toolCall", "tool_call"].freeze #: Array[String]
   KEYS_FUNCTION_CALLS = ["functionCalls", "function_calls"].freeze #: Array[String]
@@ -113,12 +114,30 @@ class Riffer::Voice::Parsers::GeminiLiveParser < Riffer::Voice::Parsers::Base
 
     return [] unless transcription.is_a?(Hash)
 
-    text = fetch_any(transcription, KEYS_TEXT_TRANSCRIPT)
+    text = extract_transcription_text(transcription)
     return [] if text.nil? || text.to_s.empty?
 
     is_final = fetch_any(transcription, KEYS_IS_FINAL)
     metadata = symbolize_hash(transcription)
     [klass.new(text: text.to_s, is_final: is_final.nil? ? nil : is_final == true, metadata: metadata)]
+  end
+
+  #: (Hash[String, untyped]) -> String?
+  def extract_transcription_text(transcription)
+    text = fetch_any(transcription, KEYS_TEXT_TRANSCRIPT)
+    return text.to_s if text.is_a?(String) && !text.empty?
+
+    parts = fetch_any(transcription, KEYS_PARTS)
+    return nil unless parts.is_a?(Array) && !parts.empty?
+
+    value = parts.filter_map do |part|
+      next unless part.is_a?(Hash)
+
+      part_text = part["text"]
+      part_text.to_s unless part_text.nil? || part_text.to_s.empty?
+    end.join("\n")
+
+    value.empty? ? nil : value
   end
 
   #: (Hash[String, untyped], Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]

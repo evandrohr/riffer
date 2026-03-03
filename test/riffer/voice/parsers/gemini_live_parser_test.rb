@@ -72,6 +72,38 @@ describe Riffer::Voice::Parsers::GeminiLiveParser do
     expect(parser.call({"foo" => "bar"})).must_equal []
   end
 
+  it "parses transcripts when text is emitted via parts" do
+    payload = {
+      "serverContent" => {
+        "inputTranscription" => {
+          "parts" => [
+            {"text" => "Need an appointment"},
+            {"text" => "next week"}
+          ],
+          "isFinal" => true
+        },
+        "outputTranscription" => {
+          "parts" => [
+            {"text" => "Sure"},
+            {"text" => "I can help with that"}
+          ],
+          "isFinal" => false
+        }
+      }
+    }
+
+    events = parser.call(payload)
+
+    expect(events.map(&:class)).must_equal [
+      Riffer::Voice::Events::InputTranscript,
+      Riffer::Voice::Events::OutputTranscript
+    ]
+    expect(events[0].text).must_equal "Need an appointment\nnext week"
+    expect(events[0].is_final).must_equal true
+    expect(events[1].text).must_equal "Sure\nI can help with that"
+    expect(events[1].is_final).must_equal false
+  end
+
   it "normalizes string tool call args into hash" do
     payload = {
       "toolCall" => {
