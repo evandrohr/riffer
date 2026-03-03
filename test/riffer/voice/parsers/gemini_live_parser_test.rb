@@ -139,6 +139,33 @@ describe Riffer::Voice::Parsers::GeminiLiveParser do
     expect(events[2].text).must_equal "hi there"
   end
 
+  it "parses audio transcription key variants from server content" do
+    payload = {
+      "serverContent" => {
+        "inputAudioTranscription" => {
+          "text" => "caller line",
+          "isFinal" => true
+        },
+        "outputAudioTranscription" => {
+          "parts" => [
+            {"text" => "assistant line 1"},
+            {"text" => "assistant line 2"}
+          ],
+          "isFinal" => true
+        }
+      }
+    }
+
+    events = parser.call(payload)
+
+    expect(events.map(&:class)).must_equal [
+      Riffer::Voice::Events::InputTranscript,
+      Riffer::Voice::Events::OutputTranscript
+    ]
+    expect(events[0].text).must_equal "caller line"
+    expect(events[1].text).must_equal "assistant line 1\nassistant line 2"
+  end
+
   it "normalizes string tool call args into hash" do
     payload = {
       "toolCall" => {

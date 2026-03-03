@@ -9,8 +9,18 @@ class Riffer::Voice::Parsers::GeminiLiveParser < Riffer::Voice::Parsers::Base
   KEYS_MODEL_TURN = ["modelTurn", "model_turn"].freeze #: Array[String]
   KEYS_INLINE_DATA = ["inlineData", "inline_data"].freeze #: Array[String]
   KEYS_MIME_TYPE = ["mimeType", "mime_type"].freeze #: Array[String]
-  KEYS_INPUT_TRANSCRIPTION = ["inputTranscription", "input_transcription"].freeze #: Array[String]
-  KEYS_OUTPUT_TRANSCRIPTION = ["outputTranscription", "output_transcription"].freeze #: Array[String]
+  KEYS_INPUT_TRANSCRIPTION = [
+    "inputTranscription",
+    "input_transcription",
+    "inputAudioTranscription",
+    "input_audio_transcription"
+  ].freeze #: Array[String]
+  KEYS_OUTPUT_TRANSCRIPTION = [
+    "outputTranscription",
+    "output_transcription",
+    "outputAudioTranscription",
+    "output_audio_transcription"
+  ].freeze #: Array[String]
   KEYS_TEXT_TRANSCRIPT = ["text", "transcript"].freeze #: Array[String]
   KEYS_PARTS = ["parts"].freeze #: Array[String]
   KEYS_IS_FINAL = ["isFinal", "final", "finished"].freeze #: Array[String]
