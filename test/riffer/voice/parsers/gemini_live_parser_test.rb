@@ -104,6 +104,41 @@ describe Riffer::Voice::Parsers::GeminiLiveParser do
     expect(events[1].is_final).must_equal false
   end
 
+  it "does not drop transcripts when audio and transcription share the same frame" do
+    payload = {
+      "serverContent" => {
+        "modelTurn" => {
+          "parts" => [
+            {
+              "inlineData" => {
+                "data" => "BASE64_AUDIO",
+                "mimeType" => "audio/pcm;rate=24000"
+              }
+            }
+          ]
+        },
+        "inputTranscription" => {
+          "text" => "hello",
+          "isFinal" => true
+        },
+        "outputTranscription" => {
+          "text" => "hi there",
+          "isFinal" => false
+        }
+      }
+    }
+
+    events = parser.call(payload)
+
+    expect(events.map(&:class)).must_equal [
+      Riffer::Voice::Events::AudioChunk,
+      Riffer::Voice::Events::InputTranscript,
+      Riffer::Voice::Events::OutputTranscript
+    ]
+    expect(events[1].text).must_equal "hello"
+    expect(events[2].text).must_equal "hi there"
+  end
+
   it "normalizes string tool call args into hash" do
     payload = {
       "toolCall" => {

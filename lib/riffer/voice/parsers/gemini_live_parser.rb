@@ -59,6 +59,8 @@ class Riffer::Voice::Parsers::GeminiLiveParser < Riffer::Voice::Parsers::Base
     return false if data["interrupted"] == true || server_content["interrupted"] == true
     return false if data.key?("toolCall") || data.key?("tool_call")
     return false if data.key?("usageMetadata") || data.key?("usage_metadata") || data.key?("usage")
+    return false if !fetch_any(server_content, KEYS_INPUT_TRANSCRIPTION).nil?
+    return false if !fetch_any(server_content, KEYS_OUTPUT_TRANSCRIPTION).nil?
 
     model_turn = fetch_any(server_content, KEYS_MODEL_TURN)
     return false unless model_turn.is_a?(Hash)
