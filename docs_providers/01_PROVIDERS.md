@@ -20,6 +20,7 @@ Use `Riffer::Voice.connect` with voice-specific provider/model identifiers:
 
 | Voice Provider | Model Prefix | Notes |
 | -------------- | ------------ | ----- |
+| Deepgram Voice Agent | `deepgram/...` | Realtime Voice Agent websocket with client-side function-calling support |
 | Gemini Live | `gemini/...` | Native audio bidirectional websocket support |
 | OpenAI Realtime GA | `openai/...` | Realtime GA websocket support |
 
@@ -184,4 +185,5 @@ Riffer::Providers::Repository.find(:mock)
 - [Custom Providers](06_CUSTOM_PROVIDERS.md) - Creating your own provider
 - [Gemini Live Voice Sessions](07_GEMINI_LIVE.md) - Realtime Gemini voice session usage
 - [OpenAI Realtime Voice Sessions](08_OPENAI_REALTIME.md) - Realtime OpenAI voice session usage
+- [Deepgram Voice Agent Sessions](09_DEEPGRAM_VOICE_AGENT.md) - Realtime Deepgram voice session usage
 - [Realtime Voice Overview](../docs/10_REALTIME_VOICE.md) - Voice session API and events

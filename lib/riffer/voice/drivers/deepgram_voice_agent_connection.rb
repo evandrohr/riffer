@@ -38,7 +38,10 @@ module Riffer::Voice::Drivers::DeepgramVoiceAgentConnection
         payload = parse_frame_payload(raw_payload)
         next unless payload
 
-        @parser.call(payload).each { |event| emit_event(event) }
+        handle_server_payload(payload)
+        parsed_events = @parser.call(payload)
+        log_inbound_payload(payload: payload, parsed_events: parsed_events)
+        parsed_events.each { |event| emit_event(event) }
       else
         emit_binary_audio_chunk(raw_payload)
       end
@@ -83,8 +86,69 @@ module Riffer::Voice::Drivers::DeepgramVoiceAgentConnection
     nil
   end
 
+  #: (Hash[String, untyped]) -> void
+  def handle_server_payload(payload)
+    type = payload["type"].to_s
+    previous_speaking = @agent_speaking == true
+
+    case type
+    when "AgentStartedSpeaking", "agent_started_speaking"
+      @agent_speaking = true
+    when "AgentAudioDone", "agent_audio_done", "UserStartedSpeaking", "user_started_speaking"
+      @agent_speaking = false
+    when "InjectionRefused", "injection_refused"
+      requeue_last_tool_response(payload)
+    end
+
+    flush_pending_tool_responses_with_recovery unless @agent_speaking
+    log_deepgram_debug(
+      event: "deepgram_voice_agent_server_state",
+      payload_type: type,
+      speaking_before: previous_speaking,
+      speaking_after: @agent_speaking == true,
+      queued_count: Array(@pending_tool_responses).length
+    )
+  end
+
+  #: () -> void
+  def flush_pending_tool_responses_with_recovery
+    flush_pending_tool_responses!
+  rescue => error
+    emit_error(
+      code: "deepgram_voice_agent_send_tool_response_failed",
+      message: error.message,
+      retriable: true,
+      metadata: {error_class: error.class.name}
+    )
+  end
+
+  #: (Hash[String, untyped]) -> void
+  def requeue_last_tool_response(payload)
+    return unless @last_outbound_message_type == "FunctionCallResponse"
+    return unless @last_tool_response_message.is_a?(Hash)
+
+    queue_tool_response_message(@last_tool_response_message)
+    @agent_speaking = true if injection_refused_due_to_speaking?(payload)
+    log_deepgram_debug(
+      event: "deepgram_voice_agent_tool_response_requeued",
+      call_id: @last_tool_response_message["id"],
+      injection_message: payload["message"],
+      queued_count: Array(@pending_tool_responses).length
+    )
+  end
+
+  #: (Hash[String, untyped]) -> bool
+  def injection_refused_due_to_speaking?(payload)
+    message = [payload["message"], payload["description"]].compact.join(" ").downcase
+    message.include?("speaking")
+  end
+
   #: (String) -> void
   def emit_binary_audio_chunk(raw_payload)
+    log_deepgram_debug(
+      event: "deepgram_voice_agent_inbound_audio",
+      bytes: raw_payload.bytesize
+    )
     emit_event(
       Riffer::Voice::Events::AudioChunk.new(
         payload: Base64.strict_encode64(raw_payload.b),
@@ -104,5 +168,19 @@ module Riffer::Voice::Drivers::DeepgramVoiceAgentConnection
 
     first_non_space = utf8_payload.lstrip[0]
     first_non_space == "{" || first_non_space == "["
+  end
+
+  #: (payload: Hash[String, untyped], parsed_events: Array[Riffer::Voice::Events::Base]) -> void
+  def log_inbound_payload(payload:, parsed_events:)
+    payload_type = payload["type"].to_s
+    log_deepgram_debug(
+      event: "deepgram_voice_agent_inbound_message",
+      payload_type: payload_type,
+      payload_keys: payload.keys,
+      parsed_events_count: parsed_events.length,
+      parsed_event_types: parsed_events.map { |event| event.class.name },
+      call_id: payload["id"] || payload["call_id"] || payload["callId"],
+      name: payload["name"] || payload["function_name"] || payload["functionName"]
+    )
   end
 end

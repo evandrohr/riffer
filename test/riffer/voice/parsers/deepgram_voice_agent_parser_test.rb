@@ -100,6 +100,52 @@ describe Riffer::Voice::Parsers::DeepgramVoiceAgentParser do
     expect(error_events.first.code).must_equal("upstream_failure")
   end
 
+  it "maps injection_refused as a retriable error event" do
+    events = parser.call(
+      {
+        "type" => "InjectionRefused",
+        "message" => "Cannot inject message while agent is currently speaking"
+      }
+    )
+
+    expect(events.map(&:class)).must_equal([Riffer::Voice::Events::Error])
+    expect(events.first.retriable).must_equal(true)
+    expect(events.first.code).must_equal("injection_refused")
+    expect(events.first.message).must_include("Cannot inject message")
+  end
+
+  it "maps function call responses into assistant output transcript metadata events" do
+    events = parser.call(
+      {
+        "type" => "FunctionCallResponse",
+        "id" => "call_1",
+        "name" => "lookup_patient",
+        "content" => "{\"status\":\"success\"}"
+      }
+    )
+
+    expect(events.map(&:class)).must_equal([Riffer::Voice::Events::OutputTranscript])
+    expect(events.first.text).must_equal("{\"status\":\"success\"}")
+    expect(events.first.is_final).must_equal(true)
+    expect(events.first.metadata[:function_call_response]).must_equal(true)
+    expect(events.first.metadata[:id]).must_equal("call_1")
+    expect(events.first.metadata[:name]).must_equal("lookup_patient")
+  end
+
+  it "does not emit executable tool calls from function call response events" do
+    events = parser.call(
+      {
+        "type" => "FunctionCallResponse",
+        "id" => "call_2",
+        "name" => "server_side_tool",
+        "content" => {"ok" => true}
+      }
+    )
+
+    expect(events.length).must_equal(1)
+    expect(events.first).must_be_instance_of(Riffer::Voice::Events::OutputTranscript)
+  end
+
   it "returns empty array for unsupported payloads" do
     expect(parser.call({"type" => "Welcome"})).must_equal([])
   end

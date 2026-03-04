@@ -29,8 +29,8 @@ Related plan: `docs/12_DEEPGRAM_VOICE_AGENT_PLAN.md`
 | WP4 | Deepgram parser implementation | DONE | Codex | 2026-03-04 | 2026-03-04 | Added parser and tests for text/tool/error/turn/interrupt |
 | WP5 | Driver lifecycle and handshake | DONE | Codex | 2026-03-04 | 2026-03-04 | Added connect/read-loop/cleanup + Settings handshake |
 | WP6 | Outbound dispatch mapping | DONE | Codex | 2026-03-04 | 2026-03-04 | Added audio/text/tool response dispatch mappings |
-| WP7 | Tool-calling interoperability policy | IN_PROGRESS | Codex | 2026-03-04 | - | Client-side execution gating implemented; server-response metadata handling pending |
-| WP8 | Documentation and examples | TODO | TBD | - | - | docs + usage sample |
+| WP7 | Tool-calling interoperability policy | DONE | Codex | 2026-03-04 | 2026-03-04 | Client-side gating + server `FunctionCallResponse` metadata mapping complete |
+| WP8 | Documentation and examples | DONE | Codex | 2026-03-04 | 2026-03-04 | Added Deepgram provider docs and realtime voice/tool-calling notes |
 
 ## 4. Phase Exit Criteria
 
@@ -56,7 +56,7 @@ Phase B status: DONE
 - [ ] `client_side: false` does not trigger local tool execution.
 - [ ] No duplicate tool execution when server function responses are present.
 
-Phase C status: IN_PROGRESS
+Phase C status: DONE
 
 ### Phase D (WP8)
 
@@ -64,7 +64,7 @@ Phase C status: IN_PROGRESS
 - [ ] End-to-end example validated.
 - [ ] Full `bundle exec rake` passing.
 
-Phase D status: TODO
+Phase D status: DONE
 
 ## 5. Test Matrix
 
@@ -142,6 +142,22 @@ Phase D status: TODO
   - finish WP7 server-side function response metadata strategy
   - execute WP8 docs+examples updates
 
+- Date: 2026-03-04
+- Author: Codex
+- Scope: WP7 completion + WP8 docs/examples
+- Changes:
+  - Added parser handling for Deepgram `FunctionCallResponse` as assistant metadata transcript events
+  - Added parser tests to ensure non-executable handling of server function responses
+  - Added `docs_providers/09_DEEPGRAM_VOICE_AGENT.md`
+  - Updated provider overview and realtime voice docs with Deepgram/tool-calling behavior
+- Tests run:
+  - `bundle exec ruby -Itest test/riffer/voice/parsers/deepgram_voice_agent_parser_test.rb`
+  - `RUBOCOP_CACHE_ROOT=tmp/rubocop_cache bundle exec rake`
+- Result:
+  - all checks passing
+- Follow-ups:
+  - optional: add example app under `examples/` for Deepgram voice session bootstrap
+
 ## 9. Weekly Snapshot
 
 ### Week of 2026-03-02
@@ -154,8 +170,9 @@ Phase D status: TODO
   - [x] Complete WP4
   - [x] Complete WP5
   - [x] Complete WP6
-  - [ ] Complete WP7
-  - [ ] Start WP8
+  - [x] Complete WP7
+  - [x] Start WP8
+  - [x] Complete WP8
 
 ## 10. Last Updated
 

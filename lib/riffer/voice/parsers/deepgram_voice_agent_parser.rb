@@ -6,9 +6,11 @@ require "json"
 # Parses Deepgram Voice Agent payloads into normalized voice events.
 class Riffer::Voice::Parsers::DeepgramVoiceAgentParser < Riffer::Voice::Parsers::Base
   FUNCTION_CALL_REQUEST_TYPES = ["FunctionCallRequest", "function_call_request"].freeze #: Array[String]
+  FUNCTION_CALL_RESPONSE_TYPES = ["FunctionCallResponse", "function_call_response"].freeze #: Array[String]
   CONVERSATION_TEXT_TYPES = ["ConversationText", "conversation_text"].freeze #: Array[String]
   USER_STARTED_SPEAKING_TYPES = ["UserStartedSpeaking", "user_started_speaking"].freeze #: Array[String]
   AGENT_AUDIO_DONE_TYPES = ["AgentAudioDone", "agent_audio_done"].freeze #: Array[String]
+  INJECTION_REFUSED_TYPES = ["InjectionRefused", "injection_refused"].freeze #: Array[String]
   ERROR_TYPES = ["Error", "error"].freeze #: Array[String]
   WARNING_TYPES = ["Warning", "warning"].freeze #: Array[String]
 
@@ -32,9 +34,11 @@ class Riffer::Voice::Parsers::DeepgramVoiceAgentParser < Riffer::Voice::Parsers:
     return [] if type.empty?
 
     return parse_function_call_request(data) if FUNCTION_CALL_REQUEST_TYPES.include?(type)
+    return parse_function_call_response(data) if FUNCTION_CALL_RESPONSE_TYPES.include?(type)
     return parse_conversation_text(data) if CONVERSATION_TEXT_TYPES.include?(type)
     return [Riffer::Voice::Events::Interrupt.new(reason: "user_started_speaking")] if USER_STARTED_SPEAKING_TYPES.include?(type)
     return [Riffer::Voice::Events::TurnComplete.new(metadata: symbolize_hash(data))] if AGENT_AUDIO_DONE_TYPES.include?(type)
+    return [parse_error_event(data, retriable: true, fallback_code: "injection_refused")] if INJECTION_REFUSED_TYPES.include?(type)
     return [parse_error_event(data, retriable: true)] if WARNING_TYPES.include?(type)
     return [parse_error_event(data, retriable: false)] if ERROR_TYPES.include?(type)
 
@@ -68,6 +72,24 @@ class Riffer::Voice::Parsers::DeepgramVoiceAgentParser < Riffer::Voice::Parsers:
   end
 
   #: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
+  def parse_function_call_response(data)
+    content = data["content"]
+    return [] if content.nil?
+
+    text = if content.is_a?(String)
+      content
+    else
+      JSON.generate(content)
+    end
+    return [] if text.empty?
+
+    metadata = symbolize_hash(data).merge(function_call_response: true)
+    [Riffer::Voice::Events::OutputTranscript.new(text: text, is_final: true, metadata: metadata)]
+  rescue JSON::GeneratorError
+    []
+  end
+
+  #: (Hash[String, untyped]) -> Array[Riffer::Voice::Events::Base]
   def parse_conversation_text(data)
     text = fetch_any(data, KEYS_TEXT)
     return [] if text.to_s.empty?
@@ -89,10 +111,10 @@ class Riffer::Voice::Parsers::DeepgramVoiceAgentParser < Riffer::Voice::Parsers:
     )]
   end
 
-  #: (Hash[String, untyped], retriable: bool) -> Riffer::Voice::Events::Error
-  def parse_error_event(data, retriable:)
+  #: (Hash[String, untyped], retriable: bool, ?fallback_code: String?) -> Riffer::Voice::Events::Error
+  def parse_error_event(data, retriable:, fallback_code: nil)
     Riffer::Voice::Events::Error.new(
-      code: (fetch_any(data, KEYS_ERROR_CODE) || "deepgram_voice_agent_error").to_s,
+      code: (fetch_any(data, KEYS_ERROR_CODE) || fallback_code || "deepgram_voice_agent_error").to_s,
       message: (fetch_any(data, KEYS_ERROR_MESSAGE) || "Deepgram voice agent error").to_s,
       retriable: retriable,
       metadata: symbolize_hash(data)

@@ -29,6 +29,7 @@ Set provider API keys globally:
 
 ```ruby
 Riffer.configure do |config|
+  config.deepgram.api_key = ENV['DEEPGRAM_API_KEY']
   config.gemini.api_key = ENV['GEMINI_API_KEY']
   config.openai.api_key = ENV['OPENAI_API_KEY']
 end
@@ -40,6 +41,7 @@ Voice models must use `provider/model` format:
 
 - `openai/gpt-realtime-1.5`
 - `gemini/gemini-2.5-flash-native-audio-preview-12-2025`
+- `deepgram/gpt-4o-mini`
 
 ## Runtime Modes
 
@@ -137,6 +139,11 @@ Notes:
   - `agent.next_event(auto_handle_tool_calls: false)`
   - `agent.events(auto_handle_tool_calls: false)`
 - Tool errors (unknown tool, validation, timeout, execution) are sent back through `send_tool_response`.
+- Deepgram function-calling interoperability:
+  - `FunctionCallRequest` events with `client_side: true` map to `Riffer::Voice::Events::ToolCall`.
+  - `FunctionCallRequest` events with `client_side: false` are not auto-dispatched locally.
+  - `FunctionCallResponse` server events are surfaced as `Riffer::Voice::Events::OutputTranscript`
+    metadata events, so server-side tool completions are visible without local re-execution.
 
 ### Voice Agent Defaults and Precedence
 
