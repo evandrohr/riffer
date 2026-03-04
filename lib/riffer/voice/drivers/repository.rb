@@ -4,6 +4,7 @@
 # Registry for realtime voice drivers.
 class Riffer::Voice::Drivers::Repository
   REPO = {
+    deepgram_voice_agent: -> { Riffer::Voice::Drivers::DeepgramVoiceAgent },
     gemini_live: -> { Riffer::Voice::Drivers::GeminiLive },
     openai_realtime: -> { Riffer::Voice::Drivers::OpenAIRealtime }
   }.freeze #: Hash[Symbol, ^() -> singleton(Riffer::Voice::Drivers::Base)]

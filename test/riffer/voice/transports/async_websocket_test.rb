@@ -3,6 +3,23 @@
 require "test_helper"
 
 describe Riffer::Voice::Transports::AsyncWebsocket do
+  describe "#write_binary" do
+    it "writes binary payload bytes to the websocket connection" do
+      writes = []
+      connection = Object.new
+      connection.define_singleton_method(:write) do |payload|
+        writes << payload
+      end
+
+      transport = Riffer::Voice::Transports::AsyncWebsocket.new(client: Object.new, connection: connection)
+      transport.write_binary("\x01\x02".b)
+
+      expect(writes.length).must_equal 1
+      expect(writes.first.encoding).must_equal Encoding::BINARY
+      expect(writes.first.bytes).must_equal [1, 2]
+    end
+  end
+
   describe ".connect" do
     it "preserves dependency load errors for missing async gems" do
       transport_class = Riffer::Voice::Transports::AsyncWebsocket

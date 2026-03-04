@@ -76,6 +76,16 @@ class Riffer::Voice::Transports::ThreadWebsocket
     @client.send(payload.to_json)
   end
 
+  #: (String) -> void
+  def write_binary(payload)
+    @client.send(payload.to_s.b, :binary)
+  rescue ArgumentError => error
+    # Older websocket-client-simple versions may not accept explicit frame type.
+    raise unless error.message.include?("wrong number of arguments")
+
+    @client.send(payload.to_s.b)
+  end
+
   #: () -> void
   def close
     return if @closed

@@ -77,6 +77,11 @@ class Riffer::Voice::Transports::AsyncWebsocket
     @connection.write(payload.to_json)
   end
 
+  #: (String) -> void
+  def write_binary(payload)
+    @connection.write(payload.to_s.b)
+  end
+
   #: () -> void
   def close
     @connection.close

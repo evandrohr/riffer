@@ -8,6 +8,10 @@ class Riffer::Voice::ModelResolver
       adapter_identifier: :openai_realtime,
       config_key: :openai
     },
+    "deepgram" => {
+      adapter_identifier: :deepgram_voice_agent,
+      config_key: :deepgram
+    },
     "gemini" => {
       adapter_identifier: :gemini_live,
       config_key: :gemini

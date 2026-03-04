@@ -2,11 +2,12 @@
 
 module VoiceDriverTestHelpers
   class FakeTransport
-    attr_reader :writes
+    attr_reader :writes, :binary_writes
 
     def initialize(frames: [], fail_writes_after: nil, write_error: nil)
       @frames = frames.dup
       @writes = []
+      @binary_writes = []
       @closed = false
       @fail_writes_after = fail_writes_after
       @write_error = write_error || RuntimeError.new("fake transport write failure")
@@ -24,6 +25,15 @@ module VoiceDriverTestHelpers
       end
 
       @writes << payload
+    end
+
+    def write_binary(payload)
+      @write_count += 1
+      if !@fail_writes_after.nil? && @write_count > @fail_writes_after
+        raise @write_error
+      end
+
+      @binary_writes << payload
     end
 
     def close

@@ -4,6 +4,12 @@ require "test_helper"
 
 describe Riffer::Voice::Adapters::Repository do
   describe ".find" do
+    it "returns DeepgramVoiceAgent for :deepgram_voice_agent" do
+      expect(Riffer::Voice::Adapters::Repository.find(:deepgram_voice_agent)).must_equal(
+        Riffer::Voice::Adapters::DeepgramVoiceAgent
+      )
+    end
+
     it "returns GeminiLive for :gemini_live" do
       expect(Riffer::Voice::Adapters::Repository.find(:gemini_live)).must_equal Riffer::Voice::Adapters::GeminiLive
     end

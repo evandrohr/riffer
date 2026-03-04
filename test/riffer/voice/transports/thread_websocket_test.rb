@@ -3,11 +3,12 @@
 require "test_helper"
 
 class ThreadWebsocketFakeClient
-  attr_reader :sent_payloads, :close_calls
+  attr_reader :sent_payloads, :sent_frames, :close_calls
 
   def initialize
     @handlers = {}
     @sent_payloads = []
+    @sent_frames = []
     @close_calls = 0
   end
 
@@ -20,7 +21,8 @@ class ThreadWebsocketFakeClient
     handler&.call(payload)
   end
 
-  def send(payload)
+  def send(payload, frame_type = nil)
+    @sent_frames << {payload: payload, frame_type: frame_type}
     @sent_payloads << payload
   end
 
@@ -81,6 +83,14 @@ describe Riffer::Voice::Transports::ThreadWebsocket do
 
       transport.write_json("type" => "ping")
       expect(client.sent_payloads).must_equal ["{\"type\":\"ping\"}"]
+      expect(client.sent_frames.first).must_equal(
+        {payload: "{\"type\":\"ping\"}", frame_type: nil}
+      )
+
+      transport.write_binary("\x01\x02".b)
+      expect(client.sent_frames[1]).must_equal(
+        {payload: "\x01\x02".b, frame_type: :binary}
+      )
 
       client.emit(:error, "boom")
       error = expect { transport.read }.must_raise(Riffer::Error)

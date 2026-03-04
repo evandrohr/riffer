@@ -66,7 +66,7 @@ module Riffer::Voice
       next if valid_tool_schema_hash?(tool)
 
       raise Riffer::ArgumentError,
-        "tools[#{index}] must be a Riffer::Tool class or a valid OpenAI/Gemini tool schema Hash"
+        "tools[#{index}] must be a Riffer::Tool class or a valid OpenAI/Gemini/Deepgram tool schema Hash"
     end
   end
   private_class_method :validate_tools!
@@ -84,7 +84,9 @@ module Riffer::Voice
     payload = deep_stringify(tool)
     return false if payload.empty?
 
-    valid_openai_tool_schema_hash?(payload) || valid_gemini_tool_schema_hash?(payload)
+    valid_openai_tool_schema_hash?(payload) ||
+      valid_gemini_tool_schema_hash?(payload) ||
+      valid_deepgram_tool_schema_hash?(payload)
   end
   private_class_method :valid_tool_schema_hash?
 
@@ -116,6 +118,27 @@ module Riffer::Voice
       entry["parameters"].is_a?(Hash)
   end
   private_class_method :valid_gemini_function_declaration?
+
+  #: (Hash[String, untyped]) -> bool
+  def self.valid_deepgram_tool_schema_hash?(payload)
+    functions = payload["functions"]
+    if functions.is_a?(Array)
+      return false if functions.empty?
+
+      return functions.all? { |entry| valid_deepgram_function_definition?(entry) }
+    end
+
+    valid_deepgram_function_definition?(payload)
+  end
+  private_class_method :valid_deepgram_tool_schema_hash?
+
+  #: (untyped) -> bool
+  def self.valid_deepgram_function_definition?(entry)
+    entry.is_a?(Hash) &&
+      non_empty_string?(entry["name"]) &&
+      entry["parameters"].is_a?(Hash)
+  end
+  private_class_method :valid_deepgram_function_definition?
 
   #: (untyped) -> bool
   def self.non_empty_string?(value)

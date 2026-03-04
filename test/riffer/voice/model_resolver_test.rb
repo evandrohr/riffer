@@ -4,13 +4,29 @@ require "test_helper"
 
 describe Riffer::Voice::ModelResolver do
   before do
+    @original_deepgram_api_key = Riffer.config.deepgram.api_key
     @original_openai_api_key = Riffer.config.openai.api_key
     @original_gemini_api_key = Riffer.config.gemini.api_key
   end
 
   after do
+    Riffer.config.deepgram.api_key = @original_deepgram_api_key
     Riffer.config.openai.api_key = @original_openai_api_key
     Riffer.config.gemini.api_key = @original_gemini_api_key
+  end
+
+  it "resolves deepgram provider/model into adapter identifier and provider model" do
+    Riffer.config.deepgram.api_key = "test-deepgram-key"
+
+    resolved = Riffer::Voice::ModelResolver.resolve(model: TestSupport::VoiceModels::DEEPGRAM_PROVIDER_MODEL)
+
+    expect(resolved).must_equal(
+      {
+        provider: "deepgram",
+        adapter_identifier: :deepgram_voice_agent,
+        model: TestSupport::VoiceModels::DEEPGRAM_MODEL
+      }
+    )
   end
 
   it "resolves openai provider/model into adapter identifier and provider model" do
@@ -64,6 +80,14 @@ describe Riffer::Voice::ModelResolver do
 
     expect {
       Riffer::Voice::ModelResolver.resolve(model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL)
+    }.must_raise Riffer::ArgumentError
+  end
+
+  it "requires deepgram api key by default for deepgram models" do
+    Riffer.config.deepgram.api_key = nil
+
+    expect {
+      Riffer::Voice::ModelResolver.resolve(model: TestSupport::VoiceModels::DEEPGRAM_PROVIDER_MODEL)
     }.must_raise Riffer::ArgumentError
   end
 

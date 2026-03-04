@@ -5,11 +5,13 @@ require_relative "../../support/voice/fake_adapter"
 
 describe "Riffer::Voice.connect validation" do
   before do
+    @original_deepgram_api_key = Riffer.config.deepgram.api_key
     @original_openai_api_key = Riffer.config.openai.api_key
     @original_gemini_api_key = Riffer.config.gemini.api_key
   end
 
   after do
+    Riffer.config.deepgram.api_key = @original_deepgram_api_key
     Riffer.config.openai.api_key = @original_openai_api_key
     Riffer.config.gemini.api_key = @original_gemini_api_key
   end
@@ -42,6 +44,18 @@ describe "Riffer::Voice.connect validation" do
     expect {
       Riffer::Voice.connect(
         model: "gemini/gemini-2.5-flash-native-audio-preview-12-2025",
+        system_prompt: "You are helpful",
+        runtime: :background
+      )
+    }.must_raise Riffer::ArgumentError
+  end
+
+  it "requires deepgram api_key when using built-in deepgram adapter" do
+    Riffer.config.deepgram.api_key = nil
+
+    expect {
+      Riffer::Voice.connect(
+        model: TestSupport::VoiceModels::DEEPGRAM_PROVIDER_MODEL,
         system_prompt: "You are helpful",
         runtime: :background
       )
@@ -112,12 +126,25 @@ describe "Riffer::Voice.connect validation" do
         }
       ]
     }
+    deepgram_tool = {
+      "functions" => [
+        {
+          "name" => "lookup_patient",
+          "parameters" => {
+            "type" => "object",
+            "properties" => {
+              "id" => {"type" => "string"}
+            }
+          }
+        }
+      ]
+    }
     adapter = TestSupport::Voice::FakeAdapter.new
 
     session = Riffer::Voice.connect(
       model: TestSupport::VoiceModels::OPENAI_PROVIDER_MODEL,
       system_prompt: "You are helpful",
-      tools: [openai_tool, gemini_tool],
+      tools: [openai_tool, gemini_tool, deepgram_tool],
       adapter_factory: ->(**_kwargs) { adapter }
     )
 

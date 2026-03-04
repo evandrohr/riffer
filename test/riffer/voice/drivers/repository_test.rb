@@ -4,6 +4,12 @@ require "test_helper"
 
 describe Riffer::Voice::Drivers::Repository do
   describe ".find" do
+    it "returns DeepgramVoiceAgent for :deepgram_voice_agent" do
+      expect(Riffer::Voice::Drivers::Repository.find(:deepgram_voice_agent)).must_equal(
+        Riffer::Voice::Drivers::DeepgramVoiceAgent
+      )
+    end
+
     it "returns GeminiLive for :gemini_live" do
       expect(Riffer::Voice::Drivers::Repository.find(:gemini_live)).must_equal Riffer::Voice::Drivers::GeminiLive
     end

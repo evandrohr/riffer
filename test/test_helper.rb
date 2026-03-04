@@ -37,6 +37,8 @@ end
 
 module TestSupport
   module VoiceModels
+    DEEPGRAM_MODEL = Riffer::Voice::Drivers::DeepgramVoiceAgent::DEFAULT_MODEL
+    DEEPGRAM_PROVIDER_MODEL = "deepgram/#{DEEPGRAM_MODEL}".freeze
     OPENAI_MODEL = Riffer::Voice::Drivers::OpenAIRealtime::DEFAULT_MODEL
     OPENAI_PROVIDER_MODEL = "openai/#{OPENAI_MODEL}".freeze
     OPENAI_LEGACY_PROVIDER_MODEL = "openai_realtime/#{OPENAI_MODEL}".freeze

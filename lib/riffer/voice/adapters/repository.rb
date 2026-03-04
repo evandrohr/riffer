@@ -4,6 +4,7 @@
 # Registry for internal realtime voice adapters.
 class Riffer::Voice::Adapters::Repository
   REPO = {
+    deepgram_voice_agent: -> { Riffer::Voice::Adapters::DeepgramVoiceAgent },
     gemini_live: -> { Riffer::Voice::Adapters::GeminiLive },
     openai_realtime: -> { Riffer::Voice::Adapters::OpenAIRealtime }
   }.freeze #: Hash[Symbol, ^() -> singleton(Riffer::Voice::Adapters::Base)]
