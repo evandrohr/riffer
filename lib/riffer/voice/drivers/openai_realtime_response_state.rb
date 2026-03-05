@@ -9,7 +9,11 @@ module Riffer::Voice::Drivers::OpenaiRealtimeResponseState
 
   #: () -> Hash[String, untyped]
   def response_create_payload
-    Riffer::Voice::Drivers::OpenAIRealtime::RESPONSE_CREATE_PAYLOAD
+    payload = deep_stringify(Riffer::Voice::Drivers::OpenAIRealtime::RESPONSE_CREATE_PAYLOAD)
+    payload["response"]["audio"]["output"]["voice"] = (
+      @output_voice || Riffer::Voice::Drivers::OpenAIRealtime::DEFAULT_OUTPUT_VOICE
+    )
+    payload
   end
 
   #: () -> void

@@ -43,6 +43,7 @@ session = Riffer::Voice.connect(
   model: "openai/gpt-realtime-1.5",
   system_prompt: "You are a concise voice assistant.",
   config: {
+    voice: "ash", # alloy, ash, ballad, coral, echo, sage, shimmer, verse, cedar, marin
     audio: {
       input: {
         turn_detection: {type: "server_vad"}

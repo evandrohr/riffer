@@ -39,6 +39,7 @@ module Riffer::Voice::Drivers::OpenaiRealtimeSessionConfig
     normalized_tools = normalize_openai_tools(tools)
     session["tools"] = normalized_tools unless normalized_tools.empty?
     session = merge_session_config(session: session, config: config)
+    session = apply_configured_output_voice!(session: session)
 
     {
       "type" => "session.update",
@@ -51,6 +52,15 @@ module Riffer::Voice::Drivers::OpenaiRealtimeSessionConfig
     return session if config.empty?
 
     overrides = deep_stringify(config)
+
+    if overrides.key?("voice")
+      overrides = overrides.dup
+      voice = overrides.delete("voice")
+      overrides["audio"] ||= {}
+      overrides["audio"]["output"] ||= {}
+      overrides["audio"]["output"]["voice"] ||= voice
+    end
+
     if overrides.key?("turn_detection")
       overrides = overrides.dup
       turn_detection = overrides.delete("turn_detection")
@@ -60,6 +70,32 @@ module Riffer::Voice::Drivers::OpenaiRealtimeSessionConfig
     end
 
     deep_merge(session, overrides)
+  end
+
+  #: (session: Hash[String, untyped]) -> Hash[String, untyped]
+  def apply_configured_output_voice!(session:)
+    voice = normalize_output_voice(session.dig("audio", "output", "voice"))
+    session["audio"]["output"]["voice"] = voice
+    @output_voice = voice
+    session
+  end
+
+  #: (untyped) -> untyped
+  def normalize_output_voice(value)
+    if value.is_a?(Hash)
+      normalized = deep_stringify(value)
+      voice_id = normalized["id"]
+      return normalized if voice_id.is_a?(String) && !voice_id.empty?
+
+      raise Riffer::ArgumentError, "openai realtime custom voice must include a non-empty id"
+    end
+
+    voice = value.to_s
+    valid_voices = Riffer::Voice::Drivers::OpenAIRealtime::VALID_OUTPUT_VOICES
+    return voice if valid_voices.include?(voice)
+
+    raise Riffer::ArgumentError,
+      "openai realtime output voice must be one of: #{valid_voices.to_a.sort.join(", ")}"
   end
 
   #: (Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]]) -> Array[Hash[String, untyped]]

@@ -7,6 +7,21 @@ require "base64"
 describe Riffer::Voice::Drivers::OpenAIRealtime do
   let(:async_task) { VoiceDriverTestHelpers::FakeAsyncTask.new }
 
+  it "exposes supported OpenAI realtime output voices" do
+    voices = Riffer::Voice::Drivers::OpenAIRealtime::VALID_OUTPUT_VOICES
+
+    expect(voices).must_include "alloy"
+    expect(voices).must_include "ash"
+    expect(voices).must_include "ballad"
+    expect(voices).must_include "coral"
+    expect(voices).must_include "echo"
+    expect(voices).must_include "sage"
+    expect(voices).must_include "shimmer"
+    expect(voices).must_include "verse"
+    expect(voices).must_include "cedar"
+    expect(voices).must_include "marin"
+  end
+
   it "connects with authorization header and writes session.update" do
     transport = VoiceDriverTestHelpers::FakeTransport.new
     connection_args = {}
@@ -163,6 +178,103 @@ describe Riffer::Voice::Drivers::OpenAIRealtime do
     expect(transport.writes.first.dig("session", "audio", "input", "transcription", "model")).must_equal(
       Riffer::Voice::Drivers::OpenAIRealtime::DEFAULT_INPUT_TRANSCRIPTION_MODEL
     )
+
+    driver.send_text_turn(text: "hello")
+    expect(transport.writes[2].dig("response", "audio", "output", "voice")).must_equal "verse"
+  end
+
+  it "supports top-level voice config alias and normalizes symbols" do
+    transport = VoiceDriverTestHelpers::FakeTransport.new
+
+    driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
+      api_key: "openai-key",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
+      transport_factory: ->(url:, headers:) { transport },
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    driver.connect(
+      system_prompt: "You are helpful",
+      config: {
+        voice: :ash
+      }
+    )
+
+    expect(transport.writes.first.dig("session", "audio", "output", "voice")).must_equal "ash"
+
+    driver.send_text_turn(text: "hello")
+    expect(transport.writes[2].dig("response", "audio", "output", "voice")).must_equal "ash"
+  end
+
+  it "supports custom OpenAI voice ids via config" do
+    transport = VoiceDriverTestHelpers::FakeTransport.new
+
+    driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
+      api_key: "openai-key",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
+      transport_factory: ->(url:, headers:) { transport },
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    driver.connect(
+      system_prompt: "You are helpful",
+      config: {
+        voice: {id: "voice_1234"}
+      }
+    )
+
+    expect(transport.writes.first.dig("session", "audio", "output", "voice")).must_equal({"id" => "voice_1234"})
+
+    driver.send_text_turn(text: "hello")
+    expect(transport.writes[2].dig("response", "audio", "output", "voice")).must_equal({"id" => "voice_1234"})
+  end
+
+  it "raises when custom voice config is missing id" do
+    transport = VoiceDriverTestHelpers::FakeTransport.new
+
+    driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
+      api_key: "openai-key",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
+      transport_factory: ->(url:, headers:) { transport },
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    error = expect {
+      driver.connect(
+        system_prompt: "You are helpful",
+        config: {
+          voice: {label: "missing id"}
+        }
+      )
+    }.must_raise Riffer::ArgumentError
+
+    expect(error.message).must_include "openai realtime custom voice must include a non-empty id"
+  end
+
+  it "raises when output voice is not supported by OpenAI realtime" do
+    transport = VoiceDriverTestHelpers::FakeTransport.new
+
+    driver = Riffer::Voice::Drivers::OpenAIRealtime.new(
+      api_key: "openai-key",
+      model: TestSupport::VoiceModels::OPENAI_MODEL,
+      transport_factory: ->(url:, headers:) { transport },
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    error = expect {
+      driver.connect(
+        system_prompt: "You are helpful",
+        config: {
+          voice: "invalid_voice"
+        }
+      )
+    }.must_raise Riffer::ArgumentError
+
+    expect(error.message).must_include "openai realtime output voice must be one of"
   end
 
   it "allows overriding input transcription config" do

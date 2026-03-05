@@ -15,6 +15,7 @@ module Riffer::Voice::Drivers::OpenaiRealtimeLifecycle
     @transport = nil
     @reader_task = nil
     @response_state_lock = response_state_lock || Riffer::Voice::Drivers::OpenAIRealtime::NoopResponseStateLock.new
+    @output_voice = Riffer::Voice::Drivers::OpenAIRealtime::DEFAULT_OUTPUT_VOICE
     @response_in_progress = false
     @response_create_pending = false
     @response_create_in_flight = false

@@ -27,7 +27,22 @@ class Riffer::Voice::Drivers::OpenAIRealtime < Riffer::Voice::Drivers::Base
 
   DEFAULT_INPUT_TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe" #: String
 
-  DEFAULT_OUTPUT_VOICE = "alloy" #: String
+  # Valid OpenAI Realtime built-in output voices (as of March 5, 2026):
+  # alloy, ash, ballad, coral, echo, sage, shimmer, verse, cedar, marin.
+  VALID_OUTPUT_VOICES = Set.new(%w[
+    alloy
+    ash
+    ballad
+    coral
+    echo
+    sage
+    shimmer
+    verse
+    cedar
+    marin
+  ]).freeze #: Set[String]
+
+  DEFAULT_OUTPUT_VOICE = "marin" #: String
 
   DEFAULT_OUTPUT_MODALITIES = ["audio"].freeze #: Array[String]
 
