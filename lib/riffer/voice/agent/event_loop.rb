@@ -91,8 +91,15 @@ module Riffer::Voice::Agent::EventLoop
 
   #: (Riffer::Voice::Events::Base, auto_handle_tool_calls: bool) -> Riffer::Voice::Events::Base
   def consume_event(event, auto_handle_tool_calls:)
-    handle_tool_call_event(event) if auto_handle_tool_calls
-    dispatch_event_callbacks(event)
+    if event.is_a?(Riffer::Voice::Events::ToolCall)
+      # Tool-call callbacks should run before automatic execution so callers can
+      # provide immediate UX feedback while the tool is executing.
+      dispatch_event_callbacks(event)
+      handle_tool_call_event(event) if auto_handle_tool_calls
+    else
+      handle_tool_call_event(event) if auto_handle_tool_calls
+      dispatch_event_callbacks(event)
+    end
     emit_checkpoint(:turn_complete, {event: event}) if event.is_a?(Riffer::Voice::Events::TurnComplete)
     event
   end

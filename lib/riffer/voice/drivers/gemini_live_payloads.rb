@@ -106,13 +106,16 @@ module Riffer::Voice::Drivers::GeminiLivePayloads
     end
   end
 
-  #: (call_id: String, result: untyped) -> Hash[String, untyped]
-  def normalize_tool_response_payload(call_id:, result:)
+  #: (call_id: String, result: untyped, ?default_name: String?) -> Hash[String, untyped]
+  def normalize_tool_response_payload(call_id:, result:, default_name: nil)
+    default_name_value = default_name.to_s
     unless result.is_a?(Hash)
-      return {
+      payload = {
         "id" => call_id,
         "response" => {"result" => result}
       }
+      payload["name"] = default_name_value unless default_name_value.empty?
+      return payload
     end
 
     payload = deep_stringify(result)
@@ -121,12 +124,17 @@ module Riffer::Voice::Drivers::GeminiLivePayloads
     }
 
     name = payload["name"]
-    tool_payload["name"] = name.to_s unless name.nil? || name.to_s.empty?
+    name_value = name.to_s
+    if name_value.empty?
+      tool_name_value = payload["tool_name"].to_s
+      name_value = tool_name_value.empty? ? default_name_value : tool_name_value
+    end
+    tool_payload["name"] = name_value unless name_value.empty?
 
     response_value = if payload.key?("response")
       payload["response"]
     else
-      payload.reject { |key, _value| key == "id" || key == "name" }
+      payload.reject { |key, _value| key == "id" || key == "name" || key == "tool_name" }
     end
 
     tool_payload["response"] = response_value.is_a?(Hash) ? response_value : {"result" => response_value}

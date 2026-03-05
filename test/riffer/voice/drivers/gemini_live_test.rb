@@ -172,6 +172,50 @@ describe Riffer::Voice::Drivers::GeminiLive do
     )
   end
 
+  it "uses parsed tool call name when sending tool response by call id" do
+    driver = Riffer::Voice::Drivers::GeminiLive.new(
+      api_key: "test-key",
+      model: "gemini-2.5-flash-native-audio-preview-12-2025",
+      transport_factory: transport_factory,
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    driver.connect(system_prompt: "You are helpful")
+    driver.send(:register_pending_tool_call_name, call_id: "call_3", name: "get_patient_appointments")
+    driver.send_tool_response(call_id: "call_3", result: {"status" => "success"})
+
+    function_response = transport.writes.last.dig("toolResponse", "functionResponses", 0)
+    expect(function_response).must_equal(
+      "id" => "call_3",
+      "name" => "get_patient_appointments",
+      "response" => {"status" => "success"}
+    )
+  end
+
+  it "accepts tool_name alias and removes it from response payload" do
+    driver = Riffer::Voice::Drivers::GeminiLive.new(
+      api_key: "test-key",
+      model: "gemini-2.5-flash-native-audio-preview-12-2025",
+      transport_factory: transport_factory,
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    driver.connect(system_prompt: "You are helpful")
+    driver.send_tool_response(
+      call_id: "call_4",
+      result: {"tool_name" => "find_patient", "status" => "success"}
+    )
+
+    function_response = transport.writes.last.dig("toolResponse", "functionResponses", 0)
+    expect(function_response).must_equal(
+      "id" => "call_4",
+      "name" => "find_patient",
+      "response" => {"status" => "success"}
+    )
+  end
+
   it "merges provided config over defaults" do
     driver = Riffer::Voice::Drivers::GeminiLive.new(
       api_key: "test-key",

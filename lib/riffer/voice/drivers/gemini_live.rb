@@ -18,7 +18,8 @@ class Riffer::Voice::Drivers::GeminiLive < Riffer::Voice::Drivers::Base
   ].join #: String
 
   DEFAULT_AUDIO_MIME_TYPE = "audio/pcm;rate=16000" #: String
-  DEFAULT_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025" #: String
+  # DEFAULT_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025" #: String
+  DEFAULT_MODEL = "gemini-live-2.5-flash-native-audio"
   DEFAULT_RESPONSE_MODALITIES = ["AUDIO"].freeze #: Array[String]
   UNSUPPORTED_SCHEMA_KEYS = ["additionalProperties"].freeze #: Array[String]
 end

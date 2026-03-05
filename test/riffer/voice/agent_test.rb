@@ -152,6 +152,34 @@ describe Riffer::Voice::Agent do
     expect(adapter.tool_responses).must_equal([{call_id: "call-1", result: "voice: hello"}])
   end
 
+  it "dispatches on_tool_call callbacks before auto tool execution" do
+    callback_snapshots = []
+    agent.on_tool_call do |event|
+      callback_snapshots << {
+        call_id: event.call_id,
+        tool_responses_before: adapter.tool_responses.length
+      }
+    end
+
+    tool_event = Riffer::Voice::Events::ToolCall.new(
+      call_id: "call-order-1",
+      name: TestSupport::Voice::EchoTool.name,
+      arguments: {"text" => "hello"}
+    )
+    adapter.emit(tool_event)
+
+    received = agent.next_event(timeout: 0)
+
+    expect(received).must_equal tool_event
+    expect(callback_snapshots).must_equal([
+      {
+        call_id: "call-order-1",
+        tool_responses_before: 0
+      }
+    ])
+    expect(adapter.tool_responses).must_equal([{call_id: "call-order-1", result: "voice: hello"}])
+  end
+
   it "sends structured unknown_tool errors when tool is not registered" do
     tool_event = Riffer::Voice::Events::ToolCall.new(
       call_id: "call-2",

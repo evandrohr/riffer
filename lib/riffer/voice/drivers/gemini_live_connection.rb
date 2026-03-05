@@ -28,7 +28,10 @@ module Riffer::Voice::Drivers::GeminiLiveConnection
       payload = parse_frame_payload(frame)
       next unless payload
 
-      @parser.call(payload).each { |event| emit_event(event) }
+      @parser.call(payload).each do |event|
+        register_tool_call_name_from_event(event)
+        emit_event(event)
+      end
     end
   rescue => error
     emit_error(code: "gemini_reader_failed", message: error.message, retriable: true, metadata: {error_class: error.class.name})
@@ -52,8 +55,16 @@ module Riffer::Voice::Drivers::GeminiLiveConnection
     @transport&.close
     @transport = nil
     @reader_task = nil
+    clear_pending_tool_call_names!
     mark_disconnected!
   rescue
     nil
+  end
+
+  #: (Riffer::Voice::Events::Base) -> void
+  def register_tool_call_name_from_event(event)
+    return unless event.is_a?(Riffer::Voice::Events::ToolCall)
+
+    register_pending_tool_call_name(call_id: event.call_id, name: event.name)
   end
 end

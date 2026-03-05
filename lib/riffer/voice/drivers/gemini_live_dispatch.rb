@@ -48,12 +48,51 @@ module Riffer::Voice::Drivers::GeminiLiveDispatch
       error_code: "gemini_send_tool_response_failed",
       failure_message: "gemini live failed sending tool response"
     ) do
-      response_payload = normalize_tool_response_payload(call_id: call_id, result: result)
+      response_payload = normalize_tool_response_payload(
+        call_id: call_id,
+        result: result,
+        default_name: consume_pending_tool_call_name(call_id: call_id)
+      )
       @transport.write_json(
         "toolResponse" => {
           "functionResponses" => [response_payload]
         }
       )
+    end
+  end
+
+  private
+
+  #: (call_id: String, name: String) -> void
+  def register_pending_tool_call_name(call_id:, name:)
+    call_id_value = call_id.to_s
+    name_value = name.to_s
+    return if call_id_value.empty? || name_value.empty?
+
+    synchronized_pending_tool_call_names do |names|
+      names[call_id_value] = name_value
+    end
+  end
+
+  #: (call_id: String) -> String?
+  def consume_pending_tool_call_name(call_id:)
+    call_id_value = call_id.to_s
+    return nil if call_id_value.empty?
+
+    synchronized_pending_tool_call_names do |names|
+      names.delete(call_id_value)
+    end
+  end
+
+  #: () -> void
+  def clear_pending_tool_call_names!
+    synchronized_pending_tool_call_names(&:clear)
+  end
+
+  #: () { (Hash[String, String]) -> untyped } -> untyped
+  def synchronized_pending_tool_call_names
+    @pending_tool_call_names_mutex.synchronize do
+      yield(@pending_tool_call_names)
     end
   end
 end

@@ -14,6 +14,8 @@ module Riffer::Voice::Drivers::GeminiLiveLifecycle
     @task_resolver = task_resolver || default_task_resolver
     @transport = nil
     @reader_task = nil
+    @pending_tool_call_names = {}
+    @pending_tool_call_names_mutex = Mutex.new
   end
 
   #: (system_prompt: String, ?tools: Array[singleton(Riffer::Tool) | Hash[Symbol | String, untyped]], ?config: Hash[Symbol | String, untyped], ?callbacks: Hash[Symbol, ^(Riffer::Voice::Events::Base) -> void]) -> bool
