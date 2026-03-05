@@ -181,7 +181,7 @@ describe Riffer::Voice::Drivers::DeepgramVoiceAgent do
     )
   end
 
-  it "sends tool responses immediately even when the agent is speaking" do
+  it "queues tool responses while the agent is speaking and flushes on agent audio done" do
     transport = VoiceDriverTestHelpers::FakeTransport.new
 
     driver = Riffer::Voice::Drivers::DeepgramVoiceAgent.new(
@@ -197,7 +197,14 @@ describe Riffer::Voice::Drivers::DeepgramVoiceAgent do
 
     driver.send_tool_response(call_id: "call_queued", result: {ok: true})
 
-    expect(transport.writes[1]).must_equal(
+    expect(transport.writes.length).must_equal(1)
+    expect(driver.instance_variable_get(:@pending_tool_responses).length).must_equal(1)
+
+    driver.send(:handle_server_payload, {"type" => "AgentAudioDone"})
+
+    flushed = transport.writes.select { |message| message["id"] == "call_queued" }
+    expect(flushed.length).must_equal(1)
+    expect(flushed.first).must_equal(
       {
         "type" => "FunctionCallResponse",
         "id" => "call_queued",
@@ -205,6 +212,34 @@ describe Riffer::Voice::Drivers::DeepgramVoiceAgent do
       }
     )
     expect(driver.instance_variable_get(:@pending_tool_responses)).must_equal([])
+  end
+
+  it "replaces queued tool responses with the latest payload for the same call id" do
+    transport = VoiceDriverTestHelpers::FakeTransport.new
+
+    driver = Riffer::Voice::Drivers::DeepgramVoiceAgent.new(
+      api_key: "deepgram-key",
+      model: TestSupport::VoiceModels::DEEPGRAM_MODEL,
+      transport_factory: ->(url:, headers:) { transport },
+      parser: VoiceDriverTestHelpers::StubParser.new,
+      task_resolver: -> { async_task }
+    )
+
+    driver.connect(system_prompt: "You are helpful")
+    driver.instance_variable_set(:@agent_speaking, true)
+
+    driver.send_tool_response(call_id: "call_replace", result: {value: 1})
+    driver.send_tool_response(call_id: "call_replace", result: {value: 2})
+
+    queued = driver.instance_variable_get(:@pending_tool_responses)
+    expect(queued.length).must_equal(1)
+    expect(queued.first["content"]).must_equal("{\"value\":2}")
+
+    driver.send(:handle_server_payload, {"type" => "AgentAudioDone"})
+
+    flushed = transport.writes.select { |message| message["id"] == "call_replace" }
+    expect(flushed.length).must_equal(1)
+    expect(flushed.first["content"]).must_equal("{\"value\":2}")
   end
 
   it "requeues rejected tool responses after injection_refused due to speaking" do
@@ -254,14 +289,14 @@ describe Riffer::Voice::Drivers::DeepgramVoiceAgent do
     )
 
     driver.connect(system_prompt: "You are helpful")
+    driver.instance_variable_set(:@agent_speaking, true)
     driver.send_tool_response(call_id: "call_flush", result: {ok: true})
-    driver.instance_variable_set(:@pending_tool_responses, [transport.writes.last])
     driver.instance_variable_set(:@agent_speaking, false)
 
     driver.send(:handle_server_payload, {"type" => "ConversationText", "role" => "assistant", "content" => "ok"})
 
     flushes = transport.writes.select { |message| message["id"] == "call_flush" }
-    expect(flushes.length).must_equal(2)
+    expect(flushes.length).must_equal(1)
   end
 
   it "raises from send_audio_chunk when payload is invalid base64 and emits error" do

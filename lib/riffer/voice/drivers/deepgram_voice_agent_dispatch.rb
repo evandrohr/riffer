@@ -46,7 +46,16 @@ module Riffer::Voice::Drivers::DeepgramVoiceAgentDispatch
         "name" => payload[:name],
         "content" => serialize_tool_result(payload[:content])
       }.compact
-      deliver_tool_response_message(message)
+      if @agent_speaking
+        queue_tool_response_message(message)
+        log_deepgram_debug(
+          event: "deepgram_voice_agent_tool_response_deferred",
+          call_id: call_id,
+          queued_count: Array(@pending_tool_responses).length
+        )
+      else
+        deliver_tool_response_message(message)
+      end
     end
   end
 
@@ -61,14 +70,14 @@ module Riffer::Voice::Drivers::DeepgramVoiceAgentDispatch
 
   #: (untyped) -> Hash[Symbol, untyped]
   def normalize_tool_response_payload(result)
-    return { name: nil, content: result } unless result.is_a?(Hash)
+    return {name: nil, content: result} unless result.is_a?(Hash)
 
     payload = deep_stringify(result)
     name = payload["name"]
     content = payload.key?("response") ? payload["response"] : payload
 
     {
-      name: name.is_a?(String) && !name.empty? ? name : nil,
+      name: (name.is_a?(String) && !name.empty?) ? name : nil,
       content: content
     }
   end
@@ -101,13 +110,23 @@ module Riffer::Voice::Drivers::DeepgramVoiceAgentDispatch
   def queue_tool_response_message(message)
     @pending_tool_responses ||= []
     message_id = message["id"].to_s
-    already_queued = !message_id.empty? && @pending_tool_responses.any? { |queued| queued["id"].to_s == message_id }
-    @pending_tool_responses << message unless already_queued
+    existing_index = if message_id.empty?
+      nil
+    else
+      @pending_tool_responses.index { |queued| queued["id"].to_s == message_id }
+    end
+
+    if existing_index.nil?
+      @pending_tool_responses << message
+    else
+      @pending_tool_responses[existing_index] = message
+    end
+
     log_deepgram_debug(
       event: "deepgram_voice_agent_tool_response_queued",
       call_id: message["id"],
       queued_count: @pending_tool_responses.length,
-      already_queued: already_queued
+      already_queued: !existing_index.nil?
     )
   end
 
